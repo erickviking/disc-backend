@@ -21,29 +21,67 @@ enum AssessmentStatus {
 }
 
 model User {
-  id            String       @id @default(cuid())
-  email         String       @unique
+  id            String           @id @default(cuid())
+  email         String           @unique
   name          String
   passwordHash  String
-  role          Role         @default(USER)
+  role          Role             @default(USER)
   phone         String?
   notes         String?
-  inviteCode    String?      @unique
+  inviteCode    String?          @unique
   invitedBy     String?
-  isActive      Boolean      @default(true)
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  isActive      Boolean          @default(true)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
 
   assessments   Assessment[]
-  inviter       User?        @relation("InvitedUsers", fields: [invitedBy], references: [id])
-  invitedUsers  User[]       @relation("InvitedUsers")
+  inviter       User?            @relation("InvitedUsers", fields: [invitedBy], references: [id])
+  invitedUsers  User[]           @relation("InvitedUsers")
+  toolAccess    UserToolAccess[]
 
   @@map("users")
+}
+
+model Tool {
+  id            String           @id @default(cuid())
+  slug          String           @unique
+  name          String
+  description   String?
+  icon          String?          // lucide icon name
+  color         String?          // hex color
+  category      String?          // ex: "comportamental", "desenvolvimento", "planejamento"
+  isActive      Boolean          @default(true)
+  isDefault     Boolean          @default(false) // auto-grant to new users
+  sortOrder     Int              @default(0)
+  config        Json?            // tool-specific config (question count, scoring method, etc)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  assessments   Assessment[]
+  userAccess    UserToolAccess[]
+  promptTemplates PromptTemplate[]
+
+  @@map("tools")
+}
+
+model UserToolAccess {
+  id        String   @id @default(cuid())
+  userId    String
+  toolId    String
+  grantedAt DateTime @default(now())
+  grantedBy String?  // admin who granted access
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tool      Tool     @relation(fields: [toolId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, toolId])
+  @@map("user_tool_access")
 }
 
 model Assessment {
   id               String           @id @default(cuid())
   userId           String
+  toolId           String?          // which tool this assessment belongs to
   status           AssessmentStatus @default(IN_PROGRESS)
   responses        Json?
   scoresRaw        Json?
@@ -56,6 +94,7 @@ model Assessment {
   updatedAt        DateTime         @updatedAt
 
   user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tool             Tool?            @relation(fields: [toolId], references: [id])
   report           Report?
 
   @@map("assessments")
@@ -83,6 +122,7 @@ model InviteLink {
   usedCount   Int       @default(0)
   expiresAt   DateTime?
   isActive    Boolean   @default(true)
+  toolIds     String[]  // tools to grant on registration
   createdAt   DateTime  @default(now())
 
   @@map("invite_links")
@@ -91,11 +131,14 @@ model InviteLink {
 model PromptTemplate {
   id        String   @id @default(cuid())
   name      String   @unique
+  toolId    String?
   template  String   @db.Text
   isActive  Boolean  @default(true)
   version   Int      @default(1)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  tool      Tool?    @relation(fields: [toolId], references: [id])
 
   @@map("prompt_templates")
 }

@@ -34,22 +34,13 @@ router.post('/login', async (req, res) => {
   try {
     const { email, password } = loginSchema.parse(req.body);
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user || !user.isActive) {
-      return res.status(401).json({ error: 'Credenciais invalidas' });
-    }
+    if (!user || !user.isActive) return res.status(401).json({ error: 'Credenciais invalidas' });
     const valid = await bcrypt.compare(password, user.passwordHash);
-    if (!valid) {
-      return res.status(401).json({ error: 'Credenciais invalidas' });
-    }
+    if (!valid) return res.status(401).json({ error: 'Credenciais invalidas' });
     const token = generateToken(user);
-    return res.json({
-      token,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role },
-    });
+    return res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
   } catch (err) {
-    if (err instanceof z.ZodError) {
-      return res.status(400).json({ error: err.errors[0].message });
-    }
+    if (err instanceof z.ZodError) return res.status(400).json({ error: err.errors[0].message });
     console.error('Login error:', err);
     return res.status(500).json({ error: 'Erro interno' });
   }
@@ -59,43 +50,45 @@ router.post('/register', async (req, res) => {
   try {
     const data = registerSchema.parse(req.body);
     const exists = await prisma.user.findUnique({ where: { email: data.email } });
-    if (exists) {
-      return res.status(409).json({ error: 'Email ja cadastrado' });
-    }
+    if (exists) return res.status(409).json({ error: 'Email ja cadastrado' });
+
     let invitedBy = null;
+    let inviteToolIds = [];
+
     if (data.inviteCode) {
       const invite = await prisma.inviteLink.findUnique({ where: { code: data.inviteCode } });
-      if (!invite || !invite.isActive) {
-        return res.status(400).json({ error: 'Codigo de convite invalido' });
-      }
-      if (invite.expiresAt && invite.expiresAt < new Date()) {
-        return res.status(400).json({ error: 'Codigo de convite expirado' });
-      }
-      if (invite.usedCount >= invite.maxUses) {
-        return res.status(400).json({ error: 'Codigo de convite esgotado' });
-      }
-      await prisma.inviteLink.update({
-        where: { id: invite.id },
-        data: { usedCount: { increment: 1 } },
-      });
+      if (!invite || !invite.isActive) return res.status(400).json({ error: 'Codigo de convite invalido' });
+      if (invite.expiresAt && invite.expiresAt < new Date()) return res.status(400).json({ error: 'Codigo de convite expirado' });
+      if (invite.usedCount >= invite.maxUses) return res.status(400).json({ error: 'Codigo de convite esgotado' });
+      await prisma.inviteLink.update({ where: { id: invite.id }, data: { usedCount: { increment: 1 } } });
       invitedBy = invite.createdById;
+      inviteToolIds = invite.toolIds || [];
     }
+
     const passwordHash = await bcrypt.hash(data.password, 12);
     const user = await prisma.user.create({
-      data: {
-        name: data.name, email: data.email, passwordHash,
-        phone: data.phone || null, invitedBy, role: 'USER',
-      },
+      data: { name: data.name, email: data.email, passwordHash, phone: data.phone || null, invitedBy, role: 'USER' },
     });
-    const token = generateToken(user);
-    return res.status(201).json({
-      token,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role },
-    });
-  } catch (err) {
-    if (err instanceof z.ZodError) {
-      return res.status(400).json({ error: err.errors[0].message });
+
+    // Grant default tools
+    const defaultTools = await prisma.tool.findMany({ where: { isDefault: true, isActive: true } });
+    const toolIdsToGrant = new Set([
+      ...defaultTools.map(t => t.id),
+      ...inviteToolIds,
+    ]);
+
+    for (const toolId of toolIdsToGrant) {
+      try {
+        await prisma.userToolAccess.create({
+          data: { userId: user.id, toolId, grantedBy: invitedBy },
+        });
+      } catch (e) { /* skip if exists */ }
     }
+
+    const token = generateToken(user);
+    return res.status(201).json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
+  } catch (err) {
+    if (err instanceof z.ZodError) return res.status(400).json({ error: err.errors[0].message });
     console.error('Register error:', err);
     return res.status(500).json({ error: 'Erro interno' });
   }

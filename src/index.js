@@ -5,6 +5,7 @@ import authRoutes from './routes/auth.js';
 import adminRoutes from './routes/admin.js';
 import { adminInviteRouter, publicInviteRouter } from './routes/invites.js';
 import { userAssessmentRouter, adminAssessmentRouter } from './routes/assessments.js';
+import { userToolRouter, adminToolRouter } from './routes/tools.js';
 import pdfRoutes from './routes/pdf.js';
 
 const app = express();
@@ -22,12 +23,14 @@ app.use('/api/invites', publicInviteRouter);
 
 // User
 app.use('/api/assessments', userAssessmentRouter);
+app.use('/api/tools', userToolRouter);
 app.use('/api/reports', pdfRoutes);
 
 // Admin
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/invites', adminInviteRouter);
 app.use('/api/admin/assessments', adminAssessmentRouter);
+app.use('/api/admin/tools', adminToolRouter);
 
 app.use((err, _req, res, _next) => {
   console.error('Unhandled error:', err);
