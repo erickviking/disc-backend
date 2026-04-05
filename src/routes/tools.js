@@ -8,35 +8,29 @@ const prisma = new PrismaClient();
 const userToolRouter = Router();
 userToolRouter.use(authenticate);
 
-// User's accessible tools
 userToolRouter.get('/', async (req, res) => {
   try {
     if (req.user.role === 'ADMIN') {
       const tools = await prisma.tool.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } });
       return res.json({ tools });
     }
-    const access = await prisma.userToolAccess.findMany({
-      where: { userId: req.user.id },
-      include: { tool: true },
-    });
+    const access = await prisma.userToolAccess.findMany({ where: { userId: req.user.id }, include: { tool: true } });
     const tools = access.map(a => a.tool).filter(t => t.isActive).sort((a, b) => a.sortOrder - b.sortOrder);
     return res.json({ tools });
   } catch (err) { console.error(err); return res.status(500).json({ error: 'Erro interno' }); }
 });
 
-// All active tools (for showing locked ones too)
+// Returns ALL tools regardless of active status (for showing locked cards)
 userToolRouter.get('/all', async (req, res) => {
   try {
     const tools = await prisma.tool.findMany({
-      where: { isActive: true },
-      select: { id: true, slug: true, name: true, description: true, icon: true, color: true, category: true, sortOrder: true },
+      select: { id: true, slug: true, name: true, description: true, icon: true, color: true, category: true, sortOrder: true, isActive: true },
       orderBy: { sortOrder: 'asc' },
     });
     return res.json({ tools });
   } catch (err) { console.error(err); return res.status(500).json({ error: 'Erro interno' }); }
 });
 
-// Admin routes
 const adminToolRouter = Router();
 adminToolRouter.use(authenticate, requireAdmin);
 
