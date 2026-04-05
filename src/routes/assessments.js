@@ -16,11 +16,19 @@ userAssessmentRouter.get('/questions', (req, res) => {
   return res.json({ questions: discQuestions, totalGroups: discQuestions.length });
 });
 
+// Criar novo assessment - permite novo se ultimo foi completado ha mais de 24h
 userAssessmentRouter.post('/', async (req, res) => {
   try {
-    const existing = await prisma.assessment.findFirst({ where: { userId: req.user.id, status: 'IN_PROGRESS' } });
-    if (existing) return res.json({ assessment: existing, resumed: true });
-    const assessment = await prisma.assessment.create({ data: { userId: req.user.id, status: 'IN_PROGRESS' } });
+    // Verificar se tem em andamento
+    const inProgress = await prisma.assessment.findFirst({
+      where: { userId: req.user.id, status: 'IN_PROGRESS' },
+    });
+    if (inProgress) return res.json({ assessment: inProgress, resumed: true });
+
+    // Permitir novo teste mesmo com testes anteriores completados
+    const assessment = await prisma.assessment.create({
+      data: { userId: req.user.id, status: 'IN_PROGRESS' },
+    });
     return res.status(201).json({ assessment, resumed: false });
   } catch (err) {
     console.error('Create assessment error:', err);
@@ -79,6 +87,27 @@ userAssessmentRouter.get('/:id/report', async (req, res) => {
   }
 });
 
+// Evolutivo - comparar todos os testes do usuario
+userAssessmentRouter.get('/evolution', async (req, res) => {
+  try {
+    const assessments = await prisma.assessment.findMany({
+      where: {
+        userId: req.user.id,
+        status: { in: ['COMPLETED', 'REVIEWED', 'RELEASED', 'REPORT_GENERATED'] },
+      },
+      select: {
+        id: true, scoresRaw: true, profilePrimary: true, profileSecondary: true,
+        completedAt: true, createdAt: true,
+      },
+      orderBy: { completedAt: 'asc' },
+    });
+    return res.json({ assessments });
+  } catch (err) {
+    console.error('Evolution error:', err);
+    return res.status(500).json({ error: 'Erro interno' });
+  }
+});
+
 // ---- Admin ----
 const adminAssessmentRouter = Router();
 adminAssessmentRouter.use(authenticate, requireAdmin);
@@ -116,7 +145,6 @@ adminAssessmentRouter.get('/:id', async (req, res) => {
   }
 });
 
-// Release + generate report + send email
 adminAssessmentRouter.patch('/:id/release', async (req, res) => {
   try {
     const assessment = await prisma.assessment.findUnique({
@@ -125,34 +153,47 @@ adminAssessmentRouter.patch('/:id/release', async (req, res) => {
     });
     if (!assessment) return res.status(404).json({ error: 'Assessment nao encontrado' });
     if (assessment.status === 'IN_PROGRESS') return res.status(400).json({ error: 'Assessment ainda nao foi completado' });
-
     const { adminNotes } = req.body || {};
     await prisma.assessment.update({
       where: { id: assessment.id },
       data: { status: 'RELEASED', releasedAt: new Date(), adminNotes: adminNotes || assessment.adminNotes },
     });
-
     let report = assessment.report;
     if (!report) {
-      try {
-        report = await generateReport(assessment.id);
-      } catch (genErr) {
+      try { report = await generateReport(assessment.id); }
+      catch (genErr) {
         console.error('Report generation failed:', genErr.message);
         return res.json({ assessment: { ...assessment, status: 'RELEASED' }, message: 'Liberado, mas falha ao gerar relatorio: ' + genErr.message, reportError: genErr.message });
       }
     }
-
-    // Send email notification
-    try {
-      await sendReportReadyEmail(assessment.user.email, assessment.user.name, config.appUrl);
-    } catch (emailErr) {
-      console.error('Email send failed:', emailErr.message);
-    }
-
+    try { await sendReportReadyEmail(assessment.user.email, assessment.user.name, config.appUrl); }
+    catch (emailErr) { console.error('Email send failed:', emailErr.message); }
     const updated = await prisma.assessment.findUnique({ where: { id: assessment.id }, include: { report: true, user: { select: { name: true, email: true } } } });
     return res.json({ assessment: updated, message: 'Assessment liberado, relatorio gerado e email enviado!' });
   } catch (err) {
     console.error('Release assessment error:', err);
+    return res.status(500).json({ error: 'Erro interno' });
+  }
+});
+
+// DELETE assessment
+adminAssessmentRouter.delete('/:id', async (req, res) => {
+  try {
+    const assessment = await prisma.assessment.findUnique({
+      where: { id: req.params.id },
+      include: { report: true },
+    });
+    if (!assessment) return res.status(404).json({ error: 'Assessment nao encontrado' });
+
+    // Delete report first if exists
+    if (assessment.report) {
+      await prisma.report.delete({ where: { id: assessment.report.id } });
+    }
+    await prisma.assessment.delete({ where: { id: req.params.id } });
+
+    return res.json({ message: 'Assessment deletado' });
+  } catch (err) {
+    console.error('Delete assessment error:', err);
     return res.status(500).json({ error: 'Erro interno' });
   }
 });
@@ -165,6 +206,27 @@ adminAssessmentRouter.get('/:id/report', async (req, res) => {
     return res.json({ report: assessment.report, scores: assessment.scoresRaw?.normalized, profilePrimary: assessment.profilePrimary, profileSecondary: assessment.profileSecondary, userName: assessment.user.name });
   } catch (err) {
     console.error('Get admin report error:', err);
+    return res.status(500).json({ error: 'Erro interno' });
+  }
+});
+
+// Admin evolution view for a user
+adminAssessmentRouter.get('/user/:userId/evolution', async (req, res) => {
+  try {
+    const assessments = await prisma.assessment.findMany({
+      where: {
+        userId: req.params.userId,
+        status: { in: ['COMPLETED', 'REVIEWED', 'RELEASED', 'REPORT_GENERATED'] },
+      },
+      select: {
+        id: true, scoresRaw: true, profilePrimary: true, profileSecondary: true,
+        completedAt: true, createdAt: true,
+      },
+      orderBy: { completedAt: 'asc' },
+    });
+    return res.json({ assessments });
+  } catch (err) {
+    console.error('Admin evolution error:', err);
     return res.status(500).json({ error: 'Erro interno' });
   }
 });
