@@ -106,7 +106,7 @@ userAssessmentRouter.get('/:id/report', async (req, res) => {
     if (!assessment) return res.status(404).json({ error: 'Assessment nao encontrado' });
     if (assessment.userId !== req.user.id) return res.status(403).json({ error: 'Sem permissao' });
     if (!assessment.report) return res.status(404).json({ error: 'Relatorio ainda nao foi gerado' });
-    return res.json({ report: assessment.report, scores: assessment.scoresRaw?.normalized || assessment.scoresRaw?.scores, scoresRaw: assessment.scoresRaw, profilePrimary: assessment.profilePrimary, profileSecondary: assessment.profileSecondary, userName: assessment.user.name });
+    return res.json({ report: assessment.report, scores: assessment.scoresRaw?.normalized, profilePrimary: assessment.profilePrimary, profileSecondary: assessment.profileSecondary, userName: assessment.user.name });
   } catch (err) {
     console.error('Get report error:', err);
     return res.status(500).json({ error: 'Erro interno' });
@@ -224,7 +224,7 @@ adminAssessmentRouter.get('/:id/report', async (req, res) => {
     const assessment = await prisma.assessment.findUnique({ where: { id: req.params.id }, include: { user: { select: { name: true, email: true } }, report: true } });
     if (!assessment) return res.status(404).json({ error: 'Assessment nao encontrado' });
     if (!assessment.report) return res.status(404).json({ error: 'Relatorio nao gerado' });
-    return res.json({ report: assessment.report, scores: assessment.scoresRaw?.normalized || assessment.scoresRaw?.scores, scoresRaw: assessment.scoresRaw, profilePrimary: assessment.profilePrimary, profileSecondary: assessment.profileSecondary, userName: assessment.user.name });
+    return res.json({ report: assessment.report, scores: assessment.scoresRaw?.normalized, profilePrimary: assessment.profilePrimary, profileSecondary: assessment.profileSecondary, userName: assessment.user.name });
   } catch (err) { console.error(err); return res.status(500).json({ error: 'Erro interno' }); }
 });
 
