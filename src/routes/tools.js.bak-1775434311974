@@ -24,7 +24,7 @@ userToolRouter.get('/', async (req, res) => {
 userToolRouter.get('/all', async (req, res) => {
   try {
     const tools = await prisma.tool.findMany({
-      select: { id: true, slug: true, name: true, description: true, icon: true, color: true, category: true, sortOrder: true, isActive: true, config: true },
+      select: { id: true, slug: true, name: true, description: true, icon: true, color: true, category: true, sortOrder: true, isActive: true },
       orderBy: { sortOrder: 'asc' },
     });
     return res.json({ tools });
@@ -48,15 +48,8 @@ adminToolRouter.get('/', async (req, res) => {
 
 adminToolRouter.patch('/:id', async (req, res) => {
   try {
-    const schema = z.object({ isActive: z.boolean().optional(), isDefault: z.boolean().optional(), name: z.string().optional(), description: z.string().optional(), sortOrder: z.number().optional(), imagePosition: z.string().optional() });
-    const { imagePosition, ...data } = schema.parse(req.body);
-    
-    // Se imagePosition foi enviado, merge no campo config (Json)
-    if (imagePosition !== undefined) {
-      const existing = await prisma.tool.findUnique({ where: { id: req.params.id }, select: { config: true } });
-      data.config = { ...(existing?.config || {}), imagePosition };
-    }
-    
+    const schema = z.object({ isActive: z.boolean().optional(), isDefault: z.boolean().optional(), name: z.string().optional(), description: z.string().optional(), sortOrder: z.number().optional() });
+    const data = schema.parse(req.body);
     const tool = await prisma.tool.update({ where: { id: req.params.id }, data });
     return res.json({ tool });
   } catch (err) {
