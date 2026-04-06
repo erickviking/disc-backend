@@ -133,19 +133,15 @@ adminAssessmentRouter.use(authenticate, requireAdmin);
 
 adminAssessmentRouter.get('/', async (req, res) => {
   try {
-    const { status, toolSlug, page = '1', limit = '20' } = req.query;
+    const { status, page = '1', limit = '20' } = req.query;
     const pageNum = Math.max(1, parseInt(page));
     const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
     const skip = (pageNum - 1) * limitNum;
     const where = {};
     if (status) where.status = status;
-    if (toolSlug) {
-      const toolRecord = await prisma.tool.findUnique({ where: { slug: toolSlug } });
-      if (toolRecord) where.toolId = toolRecord.id;
-    }
     const [assessments, total] = await Promise.all([
       prisma.assessment.findMany({
-        where, select: { id: true, status: true, profilePrimary: true, profileSecondary: true, scoresRaw: true, adminNotes: true, completedAt: true, releasedAt: true, createdAt: true, tool: { select: { slug: true, name: true } }, user: { select: { id: true, name: true, email: true } }, report: { select: { id: true, generatedAt: true } } },
+        where, select: { id: true, status: true, profilePrimary: true, profileSecondary: true, scoresRaw: true, adminNotes: true, completedAt: true, releasedAt: true, createdAt: true, user: { select: { id: true, name: true, email: true } }, report: { select: { id: true, generatedAt: true } } },
         orderBy: { createdAt: 'desc' }, skip, take: limitNum,
       }),
       prisma.assessment.count({ where }),
