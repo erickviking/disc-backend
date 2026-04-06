@@ -2,11 +2,8 @@ import { Router } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
 import { calculateDiscScores, validateResponses } from '../services/disc-scoring.js';
-import { calculateRodaDaVidaScores, validateRodaDaVidaResponses } from '../services/roda-da-vida-scoring.js';
-import { rodaDaVidaAreas } from '../data/roda-da-vida-questions.js';
 import { discQuestions } from '../data/disc-questions.js';
 import { generateReport } from '../services/report-generator.js';
-import { generateRodaDaVidaReport } from '../services/roda-da-vida-report-generator.js';
 import { sendReportReadyEmail } from '../services/email.js';
 import { config } from '../config/index.js';
 
@@ -16,24 +13,14 @@ const userAssessmentRouter = Router();
 userAssessmentRouter.use(authenticate);
 
 userAssessmentRouter.get('/questions', (req, res) => {
-  const { tool } = req.query;
-  if (tool === 'roda-da-vida') {
-    return res.json({ areas: rodaDaVidaAreas, totalQuestions: rodaDaVidaAreas.reduce((s, a) => s + a.questions.length, 0) });
-  }
   return res.json({ questions: discQuestions, totalGroups: discQuestions.length });
 });
 
 userAssessmentRouter.post('/', async (req, res) => {
   try {
-    const { toolSlug } = req.body;
-    let toolId = null;
-    if (toolSlug) {
-      const tool = await prisma.tool.findUnique({ where: { slug: toolSlug } });
-      if (tool) toolId = tool.id;
-    }
-    const inProgress = await prisma.assessment.findFirst({ where: { userId: req.user.id, status: 'IN_PROGRESS', ...(toolId ? { toolId } : {}) } });
+    const inProgress = await prisma.assessment.findFirst({ where: { userId: req.user.id, status: 'IN_PROGRESS' } });
     if (inProgress) return res.json({ assessment: inProgress, resumed: true });
-    const assessment = await prisma.assessment.create({ data: { userId: req.user.id, status: 'IN_PROGRESS', ...(toolId ? { toolId } : {}) } });
+    const assessment = await prisma.assessment.create({ data: { userId: req.user.id, status: 'IN_PROGRESS' } });
     return res.status(201).json({ assessment, resumed: false });
   } catch (err) {
     console.error('Create assessment error:', err);
@@ -48,33 +35,12 @@ userAssessmentRouter.post('/:id/submit', async (req, res) => {
     if (assessment.userId !== req.user.id) return res.status(403).json({ error: 'Sem permissao' });
     if (assessment.status !== 'IN_PROGRESS') return res.status(400).json({ error: 'Assessment ja foi submetido' });
     const { responses } = req.body;
-    
-    // Detectar tipo de assessment pelo tool associado
-    const tool = assessment.toolId ? await prisma.tool.findUnique({ where: { id: assessment.toolId } }) : null;
-    const toolSlug = tool?.slug || 'disc';
-    
-    let scoresData, profilePrimary = null, profileSecondary = null;
-    
-    if (toolSlug === 'roda-da-vida') {
-      // Roda da Vida: responses = { questionId: score(1-10) }
-      const validationError = validateRodaDaVidaResponses(responses);
-      if (validationError) return res.status(400).json({ error: validationError });
-      const result = calculateRodaDaVidaScores(responses);
-      scoresData = result;
-      profilePrimary = result.highest.area;
-      profileSecondary = result.lowest.area;
-    } else {
-      // DISC: responses = [{ groupIndex, most, least }]
-      const validationError = validateResponses(responses);
-      if (validationError) return res.status(400).json({ error: validationError });
-      const { scores, rawScores, profilePrimary: pp, profileSecondary: ps } = calculateDiscScores(responses);
-      scoresData = { normalized: scores, raw: rawScores };
-      profilePrimary = pp;
-      profileSecondary = ps;
-    }
+    const validationError = validateResponses(responses);
+    if (validationError) return res.status(400).json({ error: validationError });
+    const { scores, rawScores, profilePrimary, profileSecondary } = calculateDiscScores(responses);
     const updated = await prisma.assessment.update({
       where: { id: assessment.id },
-      data: { responses, scoresRaw: scoresData, profilePrimary, profileSecondary, status: 'COMPLETED', completedAt: new Date() },
+      data: { responses, scoresRaw: { normalized: scores, raw: rawScores }, profilePrimary, profileSecondary, status: 'COMPLETED', completedAt: new Date() },
     });
     return res.json({ assessment: updated, message: 'Assessment concluido!' });
   } catch (err) {
@@ -87,7 +53,7 @@ userAssessmentRouter.get('/mine', async (req, res) => {
   try {
     const assessments = await prisma.assessment.findMany({
       where: { userId: req.user.id },
-      select: { id: true, status: true, profilePrimary: true, profileSecondary: true, scoresRaw: true, completedAt: true, releasedAt: true, createdAt: true, tool: { select: { slug: true, name: true } }, report: { select: { id: true, generatedAt: true } } },
+      select: { id: true, status: true, profilePrimary: true, profileSecondary: true, scoresRaw: true, completedAt: true, releasedAt: true, createdAt: true, report: { select: { id: true, generatedAt: true } } },
       orderBy: { createdAt: 'desc' },
     });
     return res.json({ assessments });
@@ -188,14 +154,7 @@ adminAssessmentRouter.post('/:id/generate-report', async (req, res) => {
     if (assessment.report) return res.status(400).json({ error: 'Relatorio ja existe' });
     if (assessment.status === 'IN_PROGRESS') return res.status(400).json({ error: 'Assessment ainda nao foi completado' });
 
-    // Detectar tool para usar o gerador correto
-    const tool = assessment.toolId ? await prisma.tool.findUnique({ where: { id: assessment.toolId } }) : null;
-    let report;
-    if (tool?.slug === 'roda-da-vida') {
-      report = await generateRodaDaVidaReport(assessment.id);
-    } else {
-      report = await generateReport(assessment.id);
-    }
+    const report = await generateReport(assessment.id);
 
     try { await sendReportReadyEmail(assessment.user.email, assessment.user.name, config.appUrl); }
     catch (emailErr) { console.error('Email failed:', emailErr.message); }
