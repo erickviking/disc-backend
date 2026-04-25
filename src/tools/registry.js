@@ -1,11 +1,13 @@
 import { discTool } from './disc/index.js';
 import { rodaDaVidaTool } from './roda-da-vida/index.js';
+import { emotionalIntelligenceTool } from './inteligencia-emocional/index.js';
 
 const defaultToolSlug = 'disc';
 
 const toolHandlers = {
   [discTool.slug]: discTool,
   [rodaDaVidaTool.slug]: rodaDaVidaTool,
+  [emotionalIntelligenceTool.slug]: emotionalIntelligenceTool,
 };
 
 export function getToolHandler(slug) {
