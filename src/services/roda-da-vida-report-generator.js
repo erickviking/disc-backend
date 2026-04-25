@@ -1,8 +1,6 @@
-import { PrismaClient } from '@prisma/client';
 import { config } from '../config/index.js';
 import { rodaDaVidaAreas } from '../data/roda-da-vida-questions.js';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma.js';
 
 // Mapa de id → nome legível
 const areaNames = {};

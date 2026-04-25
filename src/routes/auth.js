@@ -2,12 +2,18 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
-import { PrismaClient } from '@prisma/client';
 import { config } from '../config/index.js';
 import { authenticate } from '../middleware/auth.js';
+import { createRateLimiter } from '../middleware/security.js';
+import { prisma } from '../lib/prisma.js';
 
-const prisma = new PrismaClient();
 const router = Router();
+
+const authRateLimit = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: 'Muitas tentativas de autenticacao. Tente novamente mais tarde.',
+});
 
 const loginSchema = z.object({
   email: z.string().email('Email invalido'),
@@ -30,7 +36,7 @@ function generateToken(user) {
   );
 }
 
-router.post('/login', async (req, res) => {
+router.post('/login', authRateLimit, async (req, res) => {
   try {
     const { email, password } = loginSchema.parse(req.body);
     const user = await prisma.user.findUnique({ where: { email } });
@@ -46,49 +52,56 @@ router.post('/login', async (req, res) => {
   }
 });
 
-router.post('/register', async (req, res) => {
+router.post('/register', authRateLimit, async (req, res) => {
   try {
     const data = registerSchema.parse(req.body);
     const exists = await prisma.user.findUnique({ where: { email: data.email } });
     if (exists) return res.status(409).json({ error: 'Email ja cadastrado' });
 
-    let invitedBy = null;
-    let inviteToolIds = [];
-
-    if (data.inviteCode) {
-      const invite = await prisma.inviteLink.findUnique({ where: { code: data.inviteCode } });
-      if (!invite || !invite.isActive) return res.status(400).json({ error: 'Codigo de convite invalido' });
-      if (invite.expiresAt && invite.expiresAt < new Date()) return res.status(400).json({ error: 'Codigo de convite expirado' });
-      if (invite.usedCount >= invite.maxUses) return res.status(400).json({ error: 'Codigo de convite esgotado' });
-      await prisma.inviteLink.update({ where: { id: invite.id }, data: { usedCount: { increment: 1 } } });
-      invitedBy = invite.createdById;
-      inviteToolIds = invite.toolIds || [];
-    }
-
     const passwordHash = await bcrypt.hash(data.password, 12);
-    const user = await prisma.user.create({
-      data: { name: data.name, email: data.email, passwordHash, phone: data.phone || null, invitedBy, role: 'USER' },
-    });
 
-    // Grant default tools
-    const defaultTools = await prisma.tool.findMany({ where: { isDefault: true, isActive: true } });
-    const toolIdsToGrant = new Set([
-      ...defaultTools.map(t => t.id),
-      ...inviteToolIds,
-    ]);
+    const { user } = await prisma.$transaction(async (tx) => {
+      let invitedBy = null;
+      let inviteToolIds = [];
 
-    for (const toolId of toolIdsToGrant) {
-      try {
-        await prisma.userToolAccess.create({
-          data: { userId: user.id, toolId, grantedBy: invitedBy },
+      if (data.inviteCode) {
+        const invite = await tx.inviteLink.findUnique({ where: { code: data.inviteCode } });
+        if (!invite || !invite.isActive) throw new Error('Codigo de convite invalido');
+        if (invite.expiresAt && invite.expiresAt < new Date()) throw new Error('Codigo de convite expirado');
+        if (invite.usedCount >= invite.maxUses) throw new Error('Codigo de convite esgotado');
+
+        await tx.inviteLink.update({ where: { id: invite.id }, data: { usedCount: { increment: 1 } } });
+        invitedBy = invite.createdById;
+        inviteToolIds = invite.toolIds || [];
+      }
+
+      const createdUser = await tx.user.create({
+        data: { name: data.name, email: data.email, passwordHash, phone: data.phone || null, invitedBy, role: 'USER' },
+      });
+
+      const defaultTools = await tx.tool.findMany({ where: { isDefault: true, isActive: true } });
+      const toolIdsToGrant = new Set([
+        ...defaultTools.map(t => t.id),
+        ...inviteToolIds,
+      ]);
+
+      for (const toolId of toolIdsToGrant) {
+        await tx.userToolAccess.upsert({
+          where: { userId_toolId: { userId: createdUser.id, toolId } },
+          update: {},
+          create: { userId: createdUser.id, toolId, grantedBy: invitedBy },
         });
-      } catch (e) { /* skip if exists */ }
-    }
+      }
+
+      return { user: createdUser };
+    });
 
     const token = generateToken(user);
     return res.status(201).json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: err.errors[0].message });
+    const knownInviteErrors = ['Codigo de convite invalido', 'Codigo de convite expirado', 'Codigo de convite esgotado'];
+    if (knownInviteErrors.includes(err.message)) return res.status(400).json({ error: err.message });
     console.error('Register error:', err);
     return res.status(500).json({ error: 'Erro interno' });
   }

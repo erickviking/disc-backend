@@ -6,12 +6,19 @@ const prisma = new PrismaClient();
 async function seed() {
   console.log('Iniciando seed...');
 
+  const adminEmail = process.env.SEED_ADMIN_EMAIL || 'admin@disc.com';
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD;
+
+  if (!adminPassword || adminPassword.length < 12) {
+    throw new Error('Defina SEED_ADMIN_PASSWORD com pelo menos 12 caracteres antes de rodar o seed.');
+  }
+
   // Admin user
-  const passwordHash = await bcrypt.hash('admin123', 12);
+  const passwordHash = await bcrypt.hash(adminPassword, 12);
   const admin = await prisma.user.upsert({
-    where: { email: 'admin@disc.com' },
+    where: { email: adminEmail },
     update: {},
-    create: { name: 'Administrador', email: 'admin@disc.com', passwordHash, role: 'ADMIN' },
+    create: { name: 'Administrador', email: adminEmail, passwordHash, role: 'ADMIN' },
   });
   console.log('Admin:', admin.email);
 
