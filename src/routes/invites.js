@@ -1,11 +1,9 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { nanoid } from 'nanoid';
-import { PrismaClient } from '@prisma/client';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
 import { config } from '../config/index.js';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma.js';
 
 const adminInviteRouter = Router();
 adminInviteRouter.use(authenticate, requireAdmin);
@@ -18,13 +16,17 @@ adminInviteRouter.post('/', async (req, res) => {
       sendEmail: z.boolean().optional(),
       emailTo: z.string().email().optional(),
       emailName: z.string().optional(),
+      toolIds: z.array(z.string()).optional(),
     });
     const data = schema.parse(req.body);
     const code = nanoid(12);
     const invite = await prisma.inviteLink.create({
       data: {
-        code, createdById: req.user.id, maxUses: data.maxUses,
+        code,
+        createdById: req.user.id,
+        maxUses: data.maxUses,
         expiresAt: data.expiresInDays ? new Date(Date.now() + data.expiresInDays * 86400000) : null,
+        toolIds: data.toolIds || [],
       },
     });
     const origin = config.appUrl || req.headers.origin || 'http://localhost:5173';
