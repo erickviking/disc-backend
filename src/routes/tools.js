@@ -1,9 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { PrismaClient } from '@prisma/client';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma.js';
 
 const userToolRouter = Router();
 userToolRouter.use(authenticate);
@@ -98,13 +96,11 @@ adminToolRouter.post('/:toolId/grant-all', async (req, res) => {
     const users = await prisma.user.findMany({ where: { isActive: true }, select: { id: true } });
     let count = 0;
     for (const user of users) {
-      try {
-        await prisma.userToolAccess.upsert({
-          where: { userId_toolId: { userId: user.id, toolId: req.params.toolId } },
-          update: {}, create: { userId: user.id, toolId: req.params.toolId, grantedBy: req.user.id },
-        });
-        count++;
-      } catch (e) {}
+      await prisma.userToolAccess.upsert({
+        where: { userId_toolId: { userId: user.id, toolId: req.params.toolId } },
+        update: {}, create: { userId: user.id, toolId: req.params.toolId, grantedBy: req.user.id },
+      });
+      count++;
     }
     return res.json({ message: 'Acesso concedido a ' + count + ' usuarios' });
   } catch (err) { console.error(err); return res.status(500).json({ error: 'Erro interno' }); }
