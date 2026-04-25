@@ -1,9 +1,8 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { authenticate } from '../middleware/auth.js';
 import { generatePDF } from '../services/pdf-generator.js';
+import { prisma } from '../lib/prisma.js';
 
-const prisma = new PrismaClient();
 const router = Router();
 router.use(authenticate);
 
