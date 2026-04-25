@@ -1,16 +1,30 @@
-import { personalValuesDimensions, personalValuesQuestions, personalValuesSubareas } from '../data/valores-pessoais-questions.js';
+import {
+  personalValuesDimensions,
+  personalValuesQuestions,
+  personalValuesSubareas,
+  personalValuesRecognitionQuestions,
+  personalValuesPriorityQuestions,
+  personalValuesDilemmaQuestions,
+} from '../data/valores-pessoais-questions.js';
+
+const dimensionIds = personalValuesDimensions.map(d => d.id);
 
 export function validatePersonalValuesResponses(responses) {
   if (!responses || typeof responses !== 'object' || Array.isArray(responses)) return 'Respostas invalidas';
   for (const q of personalValuesQuestions) {
     const value = responses[q.id];
-    if (!Number.isInteger(value) || value < 1 || value > 5) return 'Todas as perguntas devem ser respondidas em uma escala de 1 a 5';
+    if (q.type === 'likert') {
+      if (!Number.isInteger(value) || value < 1 || value > 5) return 'Todas as perguntas de reconhecimento devem ser respondidas em uma escala de 1 a 5';
+    } else {
+      const allowed = new Set((q.options || []).map(o => o.value));
+      if (typeof value !== 'string' || !allowed.has(value)) return 'Todas as escolhas e dilemas devem ser respondidos';
+    }
   }
   return null;
 }
 
-const normalize = avg => Math.round(((avg - 1) / 4) * 100);
 const avg = values => values.length ? values.reduce((s, v) => s + v, 0) / values.length : 0;
+const normalize = value => Math.round(((value - 1) / 4) * 100);
 const levelFromScore = score => score >= 82 ? 'muito_expressivo' : score >= 68 ? 'expressivo' : score >= 52 ? 'moderado' : score >= 36 ? 'pouco_sustentado' : 'desenvolvimento_prioritario';
 const isHigh = score => score >= 72;
 const isLow = score => score <= 48;
@@ -23,6 +37,47 @@ function dimensionSubareas(dimensionId) {
 
 function scoreOf(id, dimensions, subareas) {
   return dimensions[id]?.score ?? subareas[id]?.score ?? 0;
+}
+
+function initCounts() {
+  return Object.fromEntries(dimensionIds.map(id => [id, 0]));
+}
+
+function addChoiceScore(target, dimension, amount = 1) {
+  if (dimensionIds.includes(dimension)) target[dimension] = (target[dimension] || 0) + amount;
+}
+
+function calculateRecognition(responses) {
+  const subareas = {};
+  const dimensions = {};
+  for (const [subareaId, subarea] of Object.entries(personalValuesSubareas)) {
+    const questions = personalValuesRecognitionQuestions.filter(q => q.subarea === subareaId);
+    const average = avg(questions.map(q => responses[q.id]).filter(v => typeof v === 'number'));
+    const score = questions.length ? normalize(average) : 0;
+    subareas[subareaId] = { name: subarea.name, dimension: subarea.dimension, average: Number(average.toFixed(2)), score, level: levelFromScore(score) };
+  }
+  for (const dimension of personalValuesDimensions) {
+    const ids = dimensionSubareas(dimension.id);
+    const present = ids.map(id => subareas[id]).filter(s => s.score > 0);
+    const average = avg(present.map(s => s.average));
+    const score = present.length ? normalize(average) : 0;
+    dimensions[dimension.id] = { name: dimension.name, description: dimension.description, average: Number(average.toFixed(2)), score, level: levelFromScore(score), subareas: ids };
+  }
+  return { dimensions, subareas };
+}
+
+function calculateChoiceLayers(responses) {
+  const priorityCounts = initCounts();
+  const pressureCounts = initCounts();
+  const pressureContexts = {};
+  for (const q of personalValuesPriorityQuestions) addChoiceScore(priorityCounts, responses[q.id]);
+  for (const q of personalValuesDilemmaQuestions) {
+    addChoiceScore(pressureCounts, responses[q.id]);
+    pressureContexts[q.pressureContext] = responses[q.id];
+  }
+  const priorityRanking = Object.entries(priorityCounts).sort((a, b) => b[1] - a[1]).map(([id, count], index) => ({ id, name: personalValuesDimensions.find(d => d.id === id)?.name || id, count, rank: index + 1 }));
+  const pressureRanking = Object.entries(pressureCounts).sort((a, b) => b[1] - a[1]).map(([id, count], index) => ({ id, name: personalValuesDimensions.find(d => d.id === id)?.name || id, count, rank: index + 1 }));
+  return { priorityCounts, pressureCounts, priorityRanking, pressureRanking, pressureContexts };
 }
 
 const tensionRules = [
@@ -68,26 +123,49 @@ function detectSynergies(dimensions, subareas) {
   }).filter(Boolean).sort((a, b) => b.average - a.average);
 }
 
+function detectCoherenceGaps(dimensions, choiceLayers) {
+  return dimensionIds.map(id => {
+    const declared = dimensions[id]?.score || 0;
+    const prioritized = choiceLayers.priorityCounts[id] || 0;
+    const pressure = choiceLayers.pressureCounts[id] || 0;
+    const choiceWeight = prioritized + pressure;
+    let type = 'alinhado';
+    if (declared >= 72 && choiceWeight <= 1) type = 'declarado_mas_pouco_escolhido';
+    if (declared <= 48 && choiceWeight >= 3) type = 'pouco_sustentado_mas_muito_escolhido';
+    return { id, name: personalValuesDimensions.find(d => d.id === id)?.name || id, declaredScore: declared, priorityChoices: prioritized, pressureChoices: pressure, choiceWeight, type };
+  }).filter(g => g.type !== 'alinhado').sort((a, b) => b.choiceWeight - a.choiceWeight || b.declaredScore - a.declaredScore);
+}
+
 export function calculatePersonalValuesScores(responses) {
-  const dimensions = {};
-  const subareas = {};
-  for (const [subareaId, subarea] of Object.entries(personalValuesSubareas)) {
-    const questions = personalValuesQuestions.filter(q => q.subarea === subareaId);
-    const average = avg(questions.map(q => responses[q.id]));
-    const score = normalize(average);
-    subareas[subareaId] = { name: subarea.name, dimension: subarea.dimension, average: Number(average.toFixed(2)), score, level: levelFromScore(score) };
-  }
-  for (const dimension of personalValuesDimensions) {
-    const ids = dimensionSubareas(dimension.id);
-    const average = avg(ids.map(id => subareas[id].average));
-    const score = normalize(average);
-    dimensions[dimension.id] = { name: dimension.name, description: dimension.description, average: Number(average.toFixed(2)), score, level: levelFromScore(score), subareas: ids };
-  }
-  const overallAverage = avg(Object.values(dimensions).map(d => d.average));
-  const overallScore = normalize(overallAverage);
+  const { dimensions, subareas } = calculateRecognition(responses);
+  const choiceLayers = calculateChoiceLayers(responses);
+  const recognitionAverage = avg(Object.values(dimensions).map(d => d.average).filter(Boolean));
+  const overallScore = recognitionAverage ? normalize(recognitionAverage) : 0;
   const strongestDimension = Object.entries(dimensions).sort((a, b) => b[1].score - a[1].score)[0];
   const weakestDimension = Object.entries(dimensions).sort((a, b) => a[1].score - b[1].score)[0];
   const strongestSubarea = Object.entries(subareas).sort((a, b) => b[1].score - a[1].score)[0];
   const weakestSubarea = Object.entries(subareas).sort((a, b) => a[1].score - b[1].score)[0];
-  return { model: 'VP-6', scale: 'Likert 1-5 normalized to 0-100', overall: { average: Number(overallAverage.toFixed(2)), score: overallScore, level: levelFromScore(overallScore) }, dimensions, subareas, tensions: detectTensions(dimensions, subareas), synergies: detectSynergies(dimensions, subareas), highlights: { strongestDimension: { id: strongestDimension[0], ...strongestDimension[1] }, weakestDimension: { id: weakestDimension[0], ...weakestDimension[1] }, strongestSubarea: { id: strongestSubarea[0], ...strongestSubarea[1] }, weakestSubarea: { id: weakestSubarea[0], ...weakestSubarea[1] } } };
+  return {
+    model: 'MVP-6',
+    toolName: 'Mapa de Valores Pessoais',
+    scale: 'Reconhecimento Likert 1-5 + escolhas forçadas + dilemas práticos',
+    overall: { average: Number(recognitionAverage.toFixed(2)), score: overallScore, level: levelFromScore(overallScore) },
+    dimensions,
+    subareas,
+    declaredValuesRanking: Object.entries(dimensions).sort((a, b) => b[1].score - a[1].score).map(([id, d], index) => ({ id, name: d.name, score: d.score, rank: index + 1 })),
+    prioritizedValuesRanking: choiceLayers.priorityRanking,
+    pressureValuesRanking: choiceLayers.pressureRanking,
+    pressurePattern: choiceLayers.pressureContexts,
+    tensions: detectTensions(dimensions, subareas),
+    synergies: detectSynergies(dimensions, subareas),
+    coherenceGaps: detectCoherenceGaps(dimensions, choiceLayers),
+    highlights: {
+      strongestDimension: { id: strongestDimension[0], ...strongestDimension[1] },
+      weakestDimension: { id: weakestDimension[0], ...weakestDimension[1] },
+      strongestSubarea: { id: strongestSubarea[0], ...strongestSubarea[1] },
+      weakestSubarea: { id: weakestSubarea[0], ...weakestSubarea[1] },
+      topPrioritizedValue: choiceLayers.priorityRanking[0],
+      topPressureValue: choiceLayers.pressureRanking[0],
+    },
+  };
 }
