@@ -8,102 +8,66 @@ export const personalValuesDimensions = [
 ];
 
 export const personalValuesSubareas = {
-  coerencia_pessoal: { name: 'Coerência pessoal', dimension: 'identidade' },
-  autenticidade: { name: 'Autenticidade', dimension: 'identidade' },
-  vinculo: { name: 'Vínculo', dimension: 'familia_relacionamentos' },
-  responsabilidade_afetiva: { name: 'Responsabilidade afetiva', dimension: 'familia_relacionamentos' },
-  aprendizado: { name: 'Aprendizado', dimension: 'crescimento' },
-  desenvolvimento_continuo: { name: 'Desenvolvimento contínuo', dimension: 'crescimento' },
-  servico: { name: 'Serviço', dimension: 'contribuicao' },
-  impacto_positivo: { name: 'Impacto positivo', dimension: 'contribuicao' },
-  seguranca: { name: 'Segurança', dimension: 'prosperidade' },
-  expansao: { name: 'Expansão', dimension: 'prosperidade' },
-  sentido: { name: 'Sentido', dimension: 'espiritualidade_proposito' },
-  principios_orientadores: { name: 'Princípios orientadores', dimension: 'espiritualidade_proposito' },
+  coerencia_pessoal: { name: 'Coerência pessoal', dimension: 'identidade' }, autenticidade: { name: 'Autenticidade', dimension: 'identidade' },
+  vinculo: { name: 'Vínculo', dimension: 'familia_relacionamentos' }, responsabilidade_afetiva: { name: 'Responsabilidade afetiva', dimension: 'familia_relacionamentos' },
+  aprendizado: { name: 'Aprendizado', dimension: 'crescimento' }, desenvolvimento_continuo: { name: 'Desenvolvimento contínuo', dimension: 'crescimento' },
+  servico: { name: 'Serviço', dimension: 'contribuicao' }, impacto_positivo: { name: 'Impacto positivo', dimension: 'contribuicao' },
+  seguranca: { name: 'Segurança', dimension: 'prosperidade' }, expansao: { name: 'Expansão', dimension: 'prosperidade' },
+  sentido: { name: 'Sentido', dimension: 'espiritualidade_proposito' }, principios_orientadores: { name: 'Princípios orientadores', dimension: 'espiritualidade_proposito' },
 };
 
-const questionGroups = [
-  ['identidade', 'coerencia_pessoal', [
-    ['Minhas escolhas costumam estar alinhadas com aquilo que eu digo ser importante para mim.', 'Pense se existe coerência entre o que você fala que valoriza e as decisões que toma na rotina, como trabalho, família, dinheiro, tempo e relacionamentos.'],
-    ['Percebo quando estou agindo contra meus próprios valores.', 'Considere situações em que você aceita algo, se cala, promete, compra, trabalha ou se relaciona de um jeito que depois parece desalinhado com quem você quer ser.'],
-    ['Consigo tomar decisões difíceis sem abandonar completamente aquilo em que acredito.', 'Pense em momentos de pressão. A pergunta avalia se você mantém seus princípios mesmo quando seria mais fácil agradar, evitar conflito ou escolher o caminho mais conveniente.'],
-    ['Tenho clareza sobre quais valores não quero negociar.', 'Exemplos: honestidade, família, fé, saúde, liberdade, responsabilidade, excelência, presença, justiça ou respeito.'],
-  ]],
-  ['identidade', 'autenticidade', [
-    ['Consigo expressar quem eu sou sem depender excessivamente da aprovação dos outros.', 'Pense se você consegue mostrar opiniões, preferências, limites e escolhas sem se moldar o tempo todo para ser aceito(a).'],
-    ['Sinto que minha vida reflete minha identidade, não apenas expectativas externas.', 'Avalie se sua rotina parece construída por você ou se parece apenas uma resposta ao que família, sociedade, trabalho ou outras pessoas esperam.'],
-    ['Tenho coragem de assumir escolhas que fazem sentido para mim, mesmo quando são diferentes das escolhas da maioria.', 'Considere decisões sobre carreira, maternidade, casamento, dinheiro, espiritualidade, estilo de vida ou prioridades pessoais.'],
-    ['Percebo quando estou tentando parecer alguém que não sou.', 'Pense em situações em que você exagera, esconde, performa, concorda sem concordar ou tenta sustentar uma imagem que não corresponde ao seu interior.'],
-  ]],
-  ['familia_relacionamentos', 'vinculo', [
-    ['Dou atenção real às pessoas que considero importantes.', 'Pense não apenas em estar fisicamente presente, mas em escutar, olhar, conversar, demonstrar interesse e participar da vida dessas pessoas.'],
-    ['Consigo priorizar vínculos importantes mesmo em fases de muita demanda.', 'Avalie se família, casamento, filhos, amizades ou pessoas significativas continuam tendo espaço quando sua rotina fica cheia.'],
-    ['Sinto que invisto de forma intencional nos meus relacionamentos.', 'Considere atitudes práticas: conversar, pedir perdão, agradecer, planejar tempo junto, cuidar de datas importantes e demonstrar presença.'],
-    ['Percebo quando estou negligenciando pessoas importantes para mim.', 'Pense se você nota sinais como distanciamento, frieza, falta de conversa, impaciência constante ou sensação de que só sobra tempo para os outros depois de tudo.'],
-  ]],
-  ['familia_relacionamentos', 'responsabilidade_afetiva', [
-    ['Assumo responsabilidade pelo impacto que minhas atitudes causam nas pessoas próximas.', 'A pergunta não é sobre se culpar por tudo, mas sobre reconhecer quando sua fala, ausência, irritação, cobrança ou silêncio afeta o outro.'],
-    ['Consigo reparar uma relação quando percebo que falhei.', 'Pense se você consegue pedir desculpas, conversar, retomar o vínculo, explicar melhor ou mudar uma atitude depois de perceber que machucou alguém.'],
-    ['Tento comunicar meus limites sem ferir desnecessariamente o outro.', 'Considere se você consegue dizer não, pedir espaço ou explicar uma necessidade sem atacar, humilhar, sumir ou manipular.'],
-    ['Busco equilíbrio entre cuidar dos outros e não me abandonar.', 'Pense se você consegue amar, servir e estar presente sem viver em autoanulação, sobrecarga ou ressentimento.'],
-  ]],
-  ['crescimento', 'aprendizado', [
-    ['Tenho disposição para aprender mesmo quando isso confronta minhas certezas.', 'Avalie se você consegue ouvir ideias novas, feedbacks, críticas e perspectivas diferentes sem rejeitar automaticamente.'],
-    ['Busco conhecimento que me ajude a viver melhor, não apenas a performar melhor.', 'Pense em aprendizados sobre emoções, relacionamentos, espiritualidade, comunicação, saúde, finanças, propósito e comportamento.'],
-    ['Transformo experiências difíceis em aprendizado.', 'Considere se você consegue extrair lições de erros, frustrações, conflitos, perdas ou fases desafiadoras.'],
-    ['Tenho curiosidade para entender melhor meus próprios padrões.', 'Pense se você procura compreender por que reage, escolhe, evita, insiste ou sofre de determinadas formas.'],
-  ]],
-  ['crescimento', 'desenvolvimento_continuo', [
-    ['Mantenho práticas consistentes de desenvolvimento pessoal.', 'Exemplos: leitura, oração, terapia, mentoria, estudo, reflexão, exercícios, escrita, conversas profundas ou revisão de metas.'],
-    ['Consigo sustentar processos de evolução que não dão resultado imediato.', 'Pense se você continua investindo em crescimento mesmo quando não há recompensa rápida, elogio ou mudança visível no curto prazo.'],
-    ['Tenho abertura para mudar comportamentos que já não combinam com quem desejo me tornar.', 'Considere hábitos, reações emocionais, formas de comunicação, rotinas e decisões que talvez funcionaram no passado, mas hoje limitam você.'],
-    ['Vejo minha vida como um processo contínuo de amadurecimento.', 'A pergunta avalia se você entende crescimento como jornada constante, e não como algo que acontece apenas em cursos, crises ou datas especiais.'],
-  ]],
-  ['contribuicao', 'servico', [
-    ['Sinto valor em usar minhas capacidades para servir outras pessoas.', 'Pense se seus talentos, conhecimento, experiência, tempo ou presença são usados para ajudar alguém além de você mesmo(a).'],
-    ['Tenho disposição para ajudar sem precisar de reconhecimento imediato.', 'Considere se você consegue contribuir mesmo quando não recebe elogio, aplauso, status ou retorno rápido.'],
-    ['Percebo oportunidades simples de servir no cotidiano.', 'Exemplos: escutar alguém, orientar, facilitar um processo, cuidar, ensinar, apoiar, encorajar ou assumir uma responsabilidade necessária.'],
-    ['Consigo servir sem me colocar sempre em último lugar.', 'A pergunta avalia se sua contribuição vem de maturidade, e não de culpa, necessidade de aprovação ou autoabandono.'],
-  ]],
-  ['contribuicao', 'impacto_positivo', [
-    ['Penso no impacto que minhas escolhas geram nas pessoas ao meu redor.', 'Considere como suas decisões afetam família, filhos, equipe, pacientes, clientes, amigos, comunidade ou futuras gerações.'],
-    ['Desejo construir algo que deixe uma contribuição além dos meus interesses pessoais.', 'Pense em legado, educação dos filhos, trabalho com propósito, transformação de pessoas, projetos sociais, fé, família ou comunidade.'],
-    ['Procuro alinhar minhas ambições a algum tipo de impacto positivo.', 'Avalie se crescer, ganhar mais, liderar ou conquistar coisas também está conectado a beneficiar pessoas ou construir algo útil.'],
-    ['Tenho clareza sobre quem é beneficiado quando eu cresço.', 'Pense se o seu desenvolvimento melhora apenas sua vida ou também sua família, filhos, equipe, clientes, pacientes ou pessoas que dependem da sua liderança.'],
-  ]],
-  ['prosperidade', 'seguranca', [
-    ['Valorizo construir uma base segura para sustentar minhas decisões.', 'Pense em reserva financeira, organização, previsibilidade, saúde, estrutura familiar, rotina e planejamento antes de assumir grandes passos.'],
-    ['Consigo buscar segurança sem ficar paralisado(a) pelo medo.', 'A pergunta avalia se sua necessidade de segurança ajuda você a se organizar ou se impede decisões importantes.'],
-    ['Tenho responsabilidade com os recursos que passam pelas minhas mãos.', 'Considere dinheiro, tempo, energia, oportunidades, conhecimento, contatos e estrutura familiar ou profissional.'],
-    ['Cuido da minha estabilidade sem transformar controle em prisão.', 'Pense se sua busca por estabilidade permite viver melhor ou se faz você evitar todo risco, novidade ou expansão.'],
-  ]],
-  ['prosperidade', 'expansao', [
-    ['Permito-me desejar crescimento material sem culpa.', 'Avalie se você consegue desejar prosperidade, conforto, liberdade, patrimônio ou melhores condições sem sentir que isso diminui seus valores.'],
-    ['Vejo prosperidade como meio para ampliar possibilidades, não apenas como acúmulo.', 'Pense se dinheiro e recursos são vistos como instrumentos para servir, proteger, educar, criar, cuidar, construir e realizar propósito.'],
-    ['Consigo assumir riscos calculados quando eles estão alinhados aos meus valores.', 'Considere decisões como investir, mudar rota, iniciar projeto, contratar ajuda, estudar, empreender ou se posicionar melhor.'],
-    ['Tenho abertura para expandir minha vida sem abandonar minha essência.', 'A pergunta avalia se você consegue crescer em renda, influência, estrutura ou responsabilidade sem perder identidade, família, fé ou propósito.'],
-  ]],
-  ['espiritualidade_proposito', 'sentido', [
-    ['Sinto que minhas escolhas precisam estar conectadas a um sentido maior.', 'Pense se você busca mais do que funcionar, produzir ou sobreviver. Considere propósito, fé, legado, chamado, missão ou direção de vida.'],
-    ['Tenho momentos de reflexão sobre o propósito da minha vida.', 'Considere oração, silêncio, escrita, leitura, conversa profunda, meditação, estudo bíblico, terapia ou revisão de prioridades.'],
-    ['Procuro tomar decisões olhando para o legado que desejo construir.', 'Pense em como suas escolhas atuais impactam quem você está se tornando, seus filhos, sua família, sua comunidade ou sua história no longo prazo.'],
-    ['Quando estou desalinhado(a), sinto necessidade de voltar ao que dá sentido à minha vida.', 'A pergunta avalia se você percebe quando está vivendo no automático e busca reencontrar direção interior.'],
-  ]],
-  ['espiritualidade_proposito', 'principios_orientadores', [
-    ['Tenho princípios que orientam minhas decisões mesmo quando ninguém está vendo.', 'Pense em honestidade, fé, responsabilidade, verdade, justiça, amor, excelência, fidelidade, humildade ou serviço.'],
-    ['Busco agir de acordo com meus princípios em situações pequenas, não apenas nas grandes.', 'Considere atitudes simples: cumprir palavra, ser honesto(a), tratar bem, respeitar limites, cuidar do que prometeu e fazer o certo sem plateia.'],
-    ['Consigo diferenciar convicção de rigidez.', 'A pergunta avalia se você mantém princípios firmes sem se tornar inflexível, arrogante ou incapaz de escutar.'],
-    ['Minhas decisões importantes passam por algum filtro espiritual, moral ou de propósito.', 'Pense se você avalia decisões relevantes perguntando: isso combina com minha fé, meus princípios, meu chamado, minha família e o legado que desejo deixar?'],
-  ]],
+const recognitionItems = [
+  ['identidade','coerencia_pessoal','Minhas escolhas costumam estar alinhadas com aquilo que eu digo ser importante para mim.','Pense se existe coerência entre o que você fala que valoriza e as decisões que toma na rotina.'],
+  ['identidade','autenticidade','Consigo expressar quem eu sou sem depender excessivamente da aprovação dos outros.','Pense se você consegue mostrar opiniões, preferências, limites e escolhas sem se moldar para ser aceito(a).'],
+  ['identidade','autenticidade','Tenho coragem de assumir escolhas que fazem sentido para mim, mesmo quando são diferentes das escolhas da maioria.','Considere decisões sobre carreira, maternidade, casamento, dinheiro, espiritualidade e estilo de vida.'],
+  ['familia_relacionamentos','vinculo','Dou atenção real às pessoas que considero importantes.','Pense não apenas em presença física, mas em escuta, interesse e participação real na vida dessas pessoas.'],
+  ['familia_relacionamentos','responsabilidade_afetiva','Assumo responsabilidade pelo impacto que minhas atitudes causam nas pessoas próximas.','Não é sobre se culpar por tudo, mas sobre reconhecer quando fala, ausência, irritação ou silêncio afetam o outro.'],
+  ['familia_relacionamentos','responsabilidade_afetiva','Busco equilíbrio entre cuidar dos outros e não me abandonar.','Pense se você consegue amar e servir sem viver em autoanulação, sobrecarga ou ressentimento.'],
+  ['crescimento','aprendizado','Tenho disposição para aprender mesmo quando isso confronta minhas certezas.','Avalie se você consegue ouvir ideias novas, feedbacks e perspectivas diferentes sem rejeitar automaticamente.'],
+  ['crescimento','desenvolvimento_continuo','Mantenho práticas consistentes de desenvolvimento pessoal.','Exemplos: leitura, oração, terapia, mentoria, estudo, reflexão, exercícios ou revisão de metas.'],
+  ['crescimento','desenvolvimento_continuo','Tenho abertura para mudar comportamentos que já não combinam com quem desejo me tornar.','Considere hábitos, reações emocionais, comunicação e decisões que funcionaram no passado, mas hoje limitam você.'],
+  ['contribuicao','servico','Sinto valor em usar minhas capacidades para servir outras pessoas.','Pense se seus talentos, conhecimento, experiência, tempo ou presença são usados para ajudar alguém além de você mesmo(a).'],
+  ['contribuicao','impacto_positivo','Procuro alinhar minhas ambições a algum tipo de impacto positivo.','Avalie se crescer, ganhar mais, liderar ou conquistar também está conectado a beneficiar pessoas ou construir algo útil.'],
+  ['contribuicao','impacto_positivo','Tenho clareza sobre quem é beneficiado quando eu cresço.','Pense se seu desenvolvimento melhora apenas sua vida ou também sua família, equipe, clientes, pacientes ou comunidade.'],
+  ['prosperidade','seguranca','Valorizo construir uma base segura para sustentar minhas decisões.','Pense em reserva financeira, organização, previsibilidade, saúde, rotina e planejamento antes de assumir grandes passos.'],
+  ['prosperidade','expansao','Permito-me desejar crescimento material sem culpa.','Avalie se você consegue desejar prosperidade, conforto, liberdade e patrimônio sem sentir que isso diminui seus valores.'],
+  ['prosperidade','expansao','Consigo assumir riscos calculados quando eles estão alinhados aos meus valores.','Considere decisões como investir, mudar rota, iniciar projeto, contratar ajuda, estudar, empreender ou se posicionar melhor.'],
+  ['espiritualidade_proposito','sentido','Sinto que minhas escolhas precisam estar conectadas a um sentido maior.','Pense se você busca mais do que funcionar, produzir ou sobreviver. Considere propósito, fé, legado, chamado ou missão.'],
+  ['espiritualidade_proposito','principios_orientadores','Tenho princípios que orientam minhas decisões mesmo quando ninguém está vendo.','Pense em honestidade, fé, responsabilidade, verdade, justiça, amor, excelência, fidelidade, humildade ou serviço.'],
+  ['espiritualidade_proposito','principios_orientadores','Minhas decisões importantes passam por algum filtro espiritual, moral ou de propósito.','Pense se você avalia decisões perguntando: isso combina com minha fé, meus princípios, minha família e o legado que desejo deixar?'],
 ];
 
-let counter = 1;
-export const personalValuesQuestions = questionGroups.flatMap(([dimension, subarea, items]) =>
-  items.map(([text, helpText]) => ({
-    id: 'vp' + String(counter++).padStart(2, '0'),
-    dimension,
-    subarea,
-    text,
-    helpText,
-  }))
-);
+export const personalValuesRecognitionQuestions = recognitionItems.map((item, index) => ({ id: 'vp' + String(index + 1).padStart(2, '0'), type: 'likert', phase: 'recognition', dimension: item[0], subarea: item[1], text: item[2], helpText: item[3] }));
+
+export const personalValuesPriorityQuestions = [
+  { id: 'vpf01', type: 'forced_choice', phase: 'priority', text: 'Quando preciso decidir algo importante, o que normalmente pesa mais?', helpText: 'Escolha o valor que tende a governar sua decisão quando não dá para priorizar tudo ao mesmo tempo.', options: [ ['familia_relacionamentos','Família e vínculos'], ['prosperidade','Segurança e estrutura'], ['crescimento','Crescimento'], ['espiritualidade_proposito','Propósito'] ] },
+  { id: 'vpf02', type: 'forced_choice', phase: 'priority', text: 'Se você tivesse que proteger apenas uma coisa em uma fase difícil, qual seria?', helpText: 'Esta escolha revela seu valor de proteção em cenário de pressão.', options: [ ['identidade','Ser fiel a quem sou'], ['familia_relacionamentos','Preservar vínculos'], ['prosperidade','Manter estabilidade'], ['espiritualidade_proposito','Manter sentido e fé'] ] },
+  { id: 'vpf03', type: 'forced_choice', phase: 'priority', text: 'Qual perda seria mais incômoda para você por alguns meses?', helpText: 'Não responda pelo ideal. Responda pelo que realmente mexeria mais com você.', options: [ ['crescimento','Parar de evoluir'], ['familia_relacionamentos','Ter menos presença com quem amo'], ['prosperidade','Perder previsibilidade financeira'], ['contribuicao','Sentir que não estou impactando ninguém'] ] },
+  { id: 'vpf04', type: 'forced_choice', phase: 'priority', text: 'O que mais te dá sensação de uma vida bem direcionada?', helpText: 'Escolha o eixo que mais organiza sua percepção de uma vida no caminho certo.', options: [ ['espiritualidade_proposito','Sentido e propósito'], ['identidade','Coerência com minha essência'], ['contribuicao','Impacto positivo'], ['prosperidade','Construção concreta'] ] },
+  { id: 'vpf05', type: 'forced_choice', phase: 'priority', text: 'Quando surge uma oportunidade grande, qual pergunta aparece primeiro em você?', helpText: 'Essa resposta mostra o filtro automático que você usa diante de expansão.', options: [ ['crescimento','Isso me faz crescer?'], ['prosperidade','Isso é seguro e sustentável?'], ['familia_relacionamentos','Como isso afeta minha família?'], ['espiritualidade_proposito','Isso faz sentido com meu propósito?'] ] },
+  { id: 'vpf06', type: 'forced_choice', phase: 'priority', text: 'Qual destes valores você mais gostaria que seus filhos ou pessoas próximas enxergassem em você?', helpText: 'Aqui buscamos o valor que você deseja encarnar de forma visível.', options: [ ['identidade','Autenticidade'], ['familia_relacionamentos','Amor e presença'], ['contribuicao','Serviço'], ['espiritualidade_proposito','Princípios'] ] },
+  { id: 'vpf07', type: 'forced_choice', phase: 'priority', text: 'Em uma decisão com pouco tempo, você tende a proteger primeiro:', helpText: 'Pense no seu padrão real quando precisa decidir rápido.', options: [ ['prosperidade','Segurança'], ['familia_relacionamentos','Harmonia relacional'], ['identidade','Coerência pessoal'], ['crescimento','Avanço'] ] },
+  { id: 'vpf08', type: 'forced_choice', phase: 'priority', text: 'Qual conquista parece mais significativa?', helpText: 'Escolha a conquista que mais se conecta com seu senso de vida bem vivida.', options: [ ['contribuicao','Transformar a vida de pessoas'], ['prosperidade','Construir liberdade e recursos'], ['familia_relacionamentos','Ter vínculos fortes'], ['espiritualidade_proposito','Viver um chamado'] ] },
+  { id: 'vpf09', type: 'forced_choice', phase: 'priority', text: 'Qual tensão você prefere evitar?', helpText: 'A tensão que mais evitamos costuma revelar um valor muito sensível.', options: [ ['familia_relacionamentos','Conflito com pessoas importantes'], ['prosperidade','Insegurança financeira'], ['identidade','Sentir que traí minha essência'], ['crescimento','Sentir que fiquei parado(a)'] ] },
+  { id: 'vpf10', type: 'forced_choice', phase: 'priority', text: 'Qual frase mais parece uma bússola para você?', helpText: 'Escolha a frase que mais se aproxima do seu filtro interno de decisão.', options: [ ['identidade','Preciso ser fiel a quem sou.'], ['contribuicao','Preciso gerar impacto positivo.'], ['prosperidade','Preciso construir com responsabilidade.'], ['espiritualidade_proposito','Preciso viver com sentido.'] ] },
+  { id: 'vpf11', type: 'forced_choice', phase: 'priority', text: 'Quando você imagina o futuro ideal, o que aparece com mais força?', helpText: 'Essa resposta indica o valor que mais organiza sua visão de futuro.', options: [ ['familia_relacionamentos','Família e vínculos saudáveis'], ['prosperidade','Estrutura e liberdade'], ['crescimento','Evolução constante'], ['contribuicao','Legado e contribuição'] ] },
+  { id: 'vpf12', type: 'forced_choice', phase: 'priority', text: 'Qual valor você sente que precisa honrar mais nesta fase da vida?', helpText: 'Responda pensando no valor que mais pede espaço agora.', options: [ ['identidade','Identidade'], ['familia_relacionamentos','Família e relacionamentos'], ['crescimento','Crescimento'], ['espiritualidade_proposito','Propósito'] ] },
+].map(q => ({ ...q, options: q.options.map(([value, label]) => ({ value, label })) }));
+
+export const personalValuesDilemmaQuestions = [
+  { id: 'vpd01', type: 'dilemma', phase: 'pressure', pressureContext: 'opportunity', text: 'Você recebe uma oportunidade que aumentaria muito sua renda, mas reduziria sua presença familiar por alguns meses. O que mais se aproxima da sua decisão?', options: [ ['crescimento','Aceitaria, porque crescimento exige fases de sacrifício.'], ['familia_relacionamentos','Recusaria, porque presença familiar é inegociável.'], ['prosperidade','Aceitaria apenas com plano financeiro e prazo bem definidos.'], ['espiritualidade_proposito','Só aceitaria se estivesse alinhada ao meu propósito.'] ] },
+  { id: 'vpd02', type: 'dilemma', phase: 'pressure', pressureContext: 'conflict', text: 'Uma pessoa importante discorda de uma decisão que você sente ser coerente com sua identidade. O que você tende a fazer?', options: [ ['identidade','Sustento minha decisão com respeito.'], ['familia_relacionamentos','Tento preservar o vínculo mesmo cedendo parte da decisão.'], ['espiritualidade_proposito','Reavalio à luz dos meus princípios.'], ['contribuicao','Busco uma decisão que gere menos dano e mais benefício.'] ] },
+  { id: 'vpd03', type: 'dilemma', phase: 'pressure', pressureContext: 'fear', text: 'Você tem uma ideia importante, mas ela envolve risco e exposição. O que pesa mais?', options: [ ['prosperidade','Criar segurança antes de agir.'], ['crescimento','Agir para crescer mesmo com desconforto.'], ['identidade','Não me esconder se isso expressa quem sou.'], ['familia_relacionamentos','Avaliar como isso afeta minha casa e meus vínculos.'] ] },
+  { id: 'vpd04', type: 'dilemma', phase: 'pressure', pressureContext: 'purpose', text: 'Você percebe que sua rotina está produtiva, mas sem sentido. Qual movimento parece mais necessário?', options: [ ['espiritualidade_proposito','Voltar ao propósito e aos princípios.'], ['crescimento','Aprender e mudar a rota.'], ['contribuicao','Reconectar minha rotina a impacto real.'], ['prosperidade','Reorganizar a estrutura para ter mais liberdade.'] ] },
+  { id: 'vpd05', type: 'dilemma', phase: 'pressure', pressureContext: 'approval', text: 'Você é convidado(a) a participar de algo que traria aprovação social, mas não combina com sua essência. O que você tende a priorizar?', options: [ ['identidade','Coerência pessoal.'], ['familia_relacionamentos','Evitar desgastar relações.'], ['prosperidade','Avaliar se abre portas importantes.'], ['espiritualidade_proposito','Filtrar por princípios e propósito.'] ] },
+  { id: 'vpd06', type: 'dilemma', phase: 'pressure', pressureContext: 'overload', text: 'Muitas pessoas precisam de você ao mesmo tempo. O que guia sua decisão?', options: [ ['contribuicao','Servir onde posso gerar mais impacto.'], ['familia_relacionamentos','Priorizar as pessoas mais próximas.'], ['prosperidade','Proteger minha energia e estrutura.'], ['identidade','Agir sem me abandonar.'] ] },
+  { id: 'vpd07', type: 'dilemma', phase: 'pressure', pressureContext: 'long_term', text: 'Uma escolha boa no curto prazo pode comprometer seu legado no longo prazo. O que pesa mais?', options: [ ['espiritualidade_proposito','Legado e propósito.'], ['prosperidade','Sustentabilidade da decisão.'], ['contribuicao','Impacto sobre outras pessoas.'], ['crescimento','O aprendizado que isso pode gerar.'] ] },
+  { id: 'vpd08', type: 'dilemma', phase: 'pressure', pressureContext: 'change', text: 'Você sente que precisa mudar, mas a mudança pode desorganizar sua estabilidade. O que mais se aproxima de você?', options: [ ['crescimento','Mudar é necessário para amadurecer.'], ['prosperidade','Mudar sim, mas com estrutura.'], ['familia_relacionamentos','Mudar sem romper vínculos importantes.'], ['identidade','Mudar para ser mais fiel a mim.'] ] },
+].map(q => ({ ...q, options: q.options.map(([value, label]) => ({ value, label })) }));
+
+export const personalValuesQuestions = [...personalValuesRecognitionQuestions, ...personalValuesPriorityQuestions, ...personalValuesDilemmaQuestions];
+export const personalValuesPhases = [
+  { id: 'recognition', name: 'Reconhecimento', description: 'O que seus valores mostram na prática.', total: personalValuesRecognitionQuestions.length },
+  { id: 'priority', name: 'Priorização', description: 'O que pesa mais quando não dá para escolher tudo.', total: personalValuesPriorityQuestions.length },
+  { id: 'pressure', name: 'Dilemas práticos', description: 'O que você escolhe quando valores entram em conflito.', total: personalValuesDilemmaQuestions.length },
+];
