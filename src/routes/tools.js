@@ -106,4 +106,11 @@ adminToolRouter.post('/:toolId/grant-all', async (req, res) => {
   } catch (err) { console.error(err); return res.status(500).json({ error: 'Erro interno' }); }
 });
 
+adminToolRouter.delete('/:toolId/revoke-all', async (req, res) => {
+  try {
+    const result = await prisma.userToolAccess.deleteMany({ where: { toolId: req.params.toolId } });
+    return res.json({ message: 'Acesso removido de ' + result.count + ' usuarios', count: result.count });
+  } catch (err) { console.error(err); return res.status(500).json({ error: 'Erro interno' }); }
+});
+
 export { userToolRouter, adminToolRouter };
