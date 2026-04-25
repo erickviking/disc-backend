@@ -40,7 +40,7 @@ router.post('/login', authRateLimit, async (req, res) => {
   try {
     const { email, password } = loginSchema.parse(req.body);
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user || !user.isActive) return res.status(401).json({ error: 'Credenciais invalidas' });
+    if (!user || user.isActive === false) return res.status(401).json({ error: 'Credenciais invalidas' });
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) return res.status(401).json({ error: 'Credenciais invalidas' });
     const token = generateToken(user);
