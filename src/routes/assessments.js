@@ -1,24 +1,23 @@
 import { Router } from 'express';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
-import { calculateDiscScores, validateResponses } from '../services/disc-scoring.js';
-import { calculateRodaDaVidaScores, validateRodaDaVidaResponses } from '../services/roda-da-vida-scoring.js';
-import { rodaDaVidaAreas } from '../data/roda-da-vida-questions.js';
-import { discQuestions } from '../data/disc-questions.js';
-import { generateReport } from '../services/report-generator.js';
-import { generateRodaDaVidaReport } from '../services/roda-da-vida-report-generator.js';
 import { sendReportReadyEmail } from '../services/email.js';
 import { config } from '../config/index.js';
 import { prisma } from '../lib/prisma.js';
+import { getDefaultToolSlug, getToolHandler } from '../tools/registry.js';
 
 const userAssessmentRouter = Router();
 userAssessmentRouter.use(authenticate);
 
+async function resolveToolSlugById(toolId) {
+  if (!toolId) return getDefaultToolSlug();
+  const tool = await prisma.tool.findUnique({ where: { id: toolId }, select: { slug: true } });
+  return tool?.slug || getDefaultToolSlug();
+}
+
 userAssessmentRouter.get('/questions', (req, res) => {
-  const { tool } = req.query;
-  if (tool === 'roda-da-vida') {
-    return res.json({ areas: rodaDaVidaAreas, totalQuestions: rodaDaVidaAreas.reduce((s, a) => s + a.questions.length, 0) });
-  }
-  return res.json({ questions: discQuestions, totalGroups: discQuestions.length });
+  const toolSlug = req.query.tool || getDefaultToolSlug();
+  const handler = getToolHandler(toolSlug);
+  return res.json(handler.getQuestionsPayload());
 });
 
 userAssessmentRouter.post('/', async (req, res) => {
@@ -45,31 +44,14 @@ userAssessmentRouter.post('/:id/submit', async (req, res) => {
     if (!assessment) return res.status(404).json({ error: 'Assessment nao encontrado' });
     if (assessment.userId !== req.user.id) return res.status(403).json({ error: 'Sem permissao' });
     if (assessment.status !== 'IN_PROGRESS') return res.status(400).json({ error: 'Assessment ja foi submetido' });
+
     const { responses } = req.body;
-    
-    // Detectar tipo de assessment pelo tool associado
-    const tool = assessment.toolId ? await prisma.tool.findUnique({ where: { id: assessment.toolId } }) : null;
-    const toolSlug = tool?.slug || 'disc';
-    
-    let scoresData, profilePrimary = null, profileSecondary = null;
-    
-    if (toolSlug === 'roda-da-vida') {
-      // Roda da Vida: responses = { questionId: score(1-10) }
-      const validationError = validateRodaDaVidaResponses(responses);
-      if (validationError) return res.status(400).json({ error: validationError });
-      const result = calculateRodaDaVidaScores(responses);
-      scoresData = result;
-      profilePrimary = result.highest.area;
-      profileSecondary = result.lowest.area;
-    } else {
-      // DISC: responses = [{ groupIndex, most, least }]
-      const validationError = validateResponses(responses);
-      if (validationError) return res.status(400).json({ error: validationError });
-      const { scores, rawScores, profilePrimary: pp, profileSecondary: ps } = calculateDiscScores(responses);
-      scoresData = { normalized: scores, raw: rawScores };
-      profilePrimary = pp;
-      profileSecondary = ps;
-    }
+    const toolSlug = await resolveToolSlugById(assessment.toolId);
+    const handler = getToolHandler(toolSlug);
+    const validationError = handler.validateResponses(responses);
+    if (validationError) return res.status(400).json({ error: validationError });
+
+    const { scoresData, profilePrimary, profileSecondary } = handler.calculateScores(responses);
     const updated = await prisma.assessment.update({
       where: { id: assessment.id },
       data: { responses, scoresRaw: scoresData, profilePrimary, profileSecondary, status: 'COMPLETED', completedAt: new Date() },
@@ -161,7 +143,6 @@ adminAssessmentRouter.get('/:id', async (req, res) => {
   } catch (err) { console.error(err); return res.status(500).json({ error: 'Erro interno' }); }
 });
 
-// Release (sem gerar relatorio automaticamente)
 adminAssessmentRouter.patch('/:id/release', async (req, res) => {
   try {
     const assessment = await prisma.assessment.findUnique({
@@ -180,7 +161,6 @@ adminAssessmentRouter.patch('/:id/release', async (req, res) => {
   } catch (err) { console.error(err); return res.status(500).json({ error: 'Erro interno' }); }
 });
 
-// Generate report (separate action)
 adminAssessmentRouter.post('/:id/generate-report', async (req, res) => {
   try {
     const assessment = await prisma.assessment.findUnique({
@@ -191,14 +171,9 @@ adminAssessmentRouter.post('/:id/generate-report', async (req, res) => {
     if (assessment.report) return res.status(400).json({ error: 'Relatorio ja existe' });
     if (assessment.status === 'IN_PROGRESS') return res.status(400).json({ error: 'Assessment ainda nao foi completado' });
 
-    // Detectar tool para usar o gerador correto
-    const tool = assessment.toolId ? await prisma.tool.findUnique({ where: { id: assessment.toolId } }) : null;
-    let report;
-    if (tool?.slug === 'roda-da-vida') {
-      report = await generateRodaDaVidaReport(assessment.id);
-    } else {
-      report = await generateReport(assessment.id);
-    }
+    const toolSlug = await resolveToolSlugById(assessment.toolId);
+    const handler = getToolHandler(toolSlug);
+    await handler.generateReport(assessment.id);
 
     try { await sendReportReadyEmail(assessment.user.email, assessment.user.name, config.appUrl); }
     catch (emailErr) { console.error('Email failed:', emailErr.message); }
@@ -211,7 +186,6 @@ adminAssessmentRouter.post('/:id/generate-report', async (req, res) => {
   }
 });
 
-// Delete
 adminAssessmentRouter.delete('/:id', async (req, res) => {
   try {
     const assessment = await prisma.assessment.findUnique({ where: { id: req.params.id }, include: { report: true } });
