@@ -7,6 +7,7 @@ import { getDefaultToolSlug, getToolHandler } from '../tools/registry.js';
 
 const userAssessmentRouter = Router();
 userAssessmentRouter.use(authenticate);
+const autoGenerateReportTools = new Set(['inteligencia-emocional', 'valores-pessoais']);
 
 async function resolveToolSlugById(toolId) {
   if (!toolId) return getDefaultToolSlug();
@@ -96,7 +97,7 @@ userAssessmentRouter.post('/:id/submit', async (req, res) => {
       include: { report: { select: { id: true, generatedAt: true } } },
     });
 
-    if (toolSlug === 'inteligencia-emocional' && !completed.report) {
+    if (autoGenerateReportTools.has(toolSlug) && !completed.report) {
       setImmediate(() => generateReportInBackground({
         assessmentId: assessment.id,
         handler,
@@ -105,7 +106,7 @@ userAssessmentRouter.post('/:id/submit', async (req, res) => {
       }));
     }
 
-    return res.json({ assessment: completed, message: toolSlug === 'inteligencia-emocional' ? 'Assessment concluido. Relatorio em geracao.' : 'Assessment concluido!' });
+    return res.json({ assessment: completed, message: autoGenerateReportTools.has(toolSlug) ? 'Assessment concluido. Relatorio em geracao.' : 'Assessment concluido!' });
   } catch (err) {
     console.error('Submit assessment error:', err);
     return res.status(500).json({ error: err.message || 'Erro interno' });
