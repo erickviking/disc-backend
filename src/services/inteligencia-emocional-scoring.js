@@ -33,6 +33,12 @@ function average(values) {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
+function getDimensionSubareaIds(dimensionId) {
+  return Object.entries(emotionalIntelligenceSubareas)
+    .filter(([, subarea]) => subarea.dimension === dimensionId)
+    .map(([subareaId]) => subareaId);
+}
+
 export function calculateEmotionalIntelligenceScores(responses) {
   const dimensionScores = {};
   const subareaScores = {};
@@ -41,17 +47,19 @@ export function calculateEmotionalIntelligenceScores(responses) {
     const questions = emotionalIntelligenceQuestions.filter(q => q.subarea === subareaId);
     const values = questions.map(q => responses[q.id]);
     const avg = average(values);
+    const score = normalizeLikertAverage(avg);
     subareaScores[subareaId] = {
       name: subarea.name,
       dimension: subarea.dimension,
       average: Number(avg.toFixed(2)),
-      score: normalizeLikertAverage(avg),
-      level: levelFromScore(normalizeLikertAverage(avg)),
+      score,
+      level: levelFromScore(score),
     };
   }
 
   for (const dimension of emotionalIntelligenceDimensions) {
-    const subareas = dimension.subareas.map(id => subareaScores[id]);
+    const subareaIds = Array.isArray(dimension.subareas) ? dimension.subareas : getDimensionSubareaIds(dimension.id);
+    const subareas = subareaIds.map(id => subareaScores[id]).filter(Boolean);
     const avg = average(subareas.map(s => s.average));
     const score = normalizeLikertAverage(avg);
     dimensionScores[dimension.id] = {
@@ -60,7 +68,7 @@ export function calculateEmotionalIntelligenceScores(responses) {
       average: Number(avg.toFixed(2)),
       score,
       level: levelFromScore(score),
-      subareas: dimension.subareas,
+      subareas: subareaIds,
     };
   }
 
