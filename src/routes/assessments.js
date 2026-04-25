@@ -38,7 +38,7 @@ userAssessmentRouter.post('/', async (req, res) => {
   }
 });
 
-userAssessmentRouter.post('/:id/submit', async (req, res) => {
+userAssessmentRouter.patch('/:id/responses', async (req, res) => {
   try {
     const assessment = await prisma.assessment.findUnique({ where: { id: req.params.id } });
     if (!assessment) return res.status(404).json({ error: 'Assessment nao encontrado' });
@@ -46,6 +46,31 @@ userAssessmentRouter.post('/:id/submit', async (req, res) => {
     if (assessment.status !== 'IN_PROGRESS') return res.status(400).json({ error: 'Assessment ja foi submetido' });
 
     const { responses } = req.body;
+    if (!responses || typeof responses !== 'object' || Array.isArray(responses)) {
+      return res.status(400).json({ error: 'Respostas invalidas' });
+    }
+
+    const updated = await prisma.assessment.update({
+      where: { id: assessment.id },
+      data: { responses },
+      select: { id: true, responses: true, updatedAt: true },
+    });
+
+    return res.json({ assessment: updated, message: 'Progresso salvo' });
+  } catch (err) {
+    console.error('Save responses error:', err);
+    return res.status(500).json({ error: 'Erro ao salvar progresso' });
+  }
+});
+
+userAssessmentRouter.post('/:id/submit', async (req, res) => {
+  try {
+    const assessment = await prisma.assessment.findUnique({ where: { id: req.params.id } });
+    if (!assessment) return res.status(404).json({ error: 'Assessment nao encontrado' });
+    if (assessment.userId !== req.user.id) return res.status(403).json({ error: 'Sem permissao' });
+    if (assessment.status !== 'IN_PROGRESS') return res.status(400).json({ error: 'Assessment ja foi submetido' });
+
+    const responses = req.body?.responses || assessment.responses;
     const toolSlug = await resolveToolSlugById(assessment.toolId);
     const handler = getToolHandler(toolSlug);
     const validationError = handler.validateResponses(responses);
@@ -67,7 +92,7 @@ userAssessmentRouter.get('/mine', async (req, res) => {
   try {
     const assessments = await prisma.assessment.findMany({
       where: { userId: req.user.id },
-      select: { id: true, status: true, profilePrimary: true, profileSecondary: true, scoresRaw: true, completedAt: true, releasedAt: true, createdAt: true, tool: { select: { slug: true, name: true } }, report: { select: { id: true, generatedAt: true } } },
+      select: { id: true, status: true, responses: true, profilePrimary: true, profileSecondary: true, scoresRaw: true, completedAt: true, releasedAt: true, createdAt: true, tool: { select: { slug: true, name: true } }, report: { select: { id: true, generatedAt: true } } },
       orderBy: { createdAt: 'desc' },
     });
     return res.json({ assessments });
