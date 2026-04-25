@@ -1,10 +1,15 @@
-import { personalValuesDimensions, personalValuesQuestions, personalValuesSubareas } from '../data/valores-pessoais-questions.js';
+import { personalValuesDimensions, personalValuesQuestions, personalValuesRecognitionQuestions, personalValuesSubareas } from '../data/valores-pessoais-questions.js';
 
 export function validatePersonalValuesResponses(responses) {
   if (!responses || typeof responses !== 'object' || Array.isArray(responses)) return 'Respostas invalidas';
   for (const q of personalValuesQuestions) {
     const value = responses[q.id];
-    if (!Number.isInteger(value) || value < 1 || value > 5) return 'Todas as perguntas devem ser respondidas em uma escala de 1 a 5';
+    if (q.type === 'likert') {
+      if (!Number.isInteger(value) || value < 1 || value > 5) return 'Todas as perguntas de reconhecimento devem ser respondidas em uma escala de 1 a 5';
+    } else {
+      const validValues = new Set((q.options || []).map(o => o.value));
+      if (typeof value !== 'string' || !validValues.has(value)) return 'Todas as perguntas de escolha devem ser respondidas selecionando uma opção válida';
+    }
   }
   return null;
 }
@@ -17,13 +22,11 @@ const isLow = score => score <= 48;
 const isVeryHigh = score => score >= 82;
 const isVeryLow = score => score <= 38;
 
-function dimensionSubareas(dimensionId) {
-  return Object.entries(personalValuesSubareas).filter(([, s]) => s.dimension === dimensionId).map(([id]) => id);
-}
-
-function scoreOf(id, dimensions, subareas) {
-  return dimensions[id]?.score ?? subareas[id]?.score ?? 0;
-}
+function dimensionSubareas(dimensionId) { return Object.entries(personalValuesSubareas).filter(([, s]) => s.dimension === dimensionId).map(([id]) => id); }
+function scoreOf(id, dimensions, subareas) { return dimensions[id]?.score ?? subareas[id]?.score ?? 0; }
+function dimensionOfValue(value) { return personalValuesSubareas[value]?.dimension || (personalValuesDimensions.some(d => d.id === value) ? value : null); }
+function emptyCounts() { return Object.fromEntries(personalValuesDimensions.map(d => [d.id, 0])); }
+function rankCounts(counts) { return Object.entries(counts).map(([id, count]) => ({ id, name: personalValuesDimensions.find(d => d.id === id)?.name || id, count })).sort((a, b) => b.count - a.count); }
 
 const tensionRules = [
   ['ambicao_travada', 'Ambição travada', ['crescimento'], ['seguranca'], 'Existe desejo de crescer, aprender e expandir, mas a necessidade de segurança pode gerar adiamento, medo de risco ou busca excessiva por garantia antes de agir.'],
@@ -68,11 +71,11 @@ function detectSynergies(dimensions, subareas) {
   }).filter(Boolean).sort((a, b) => b.average - a.average);
 }
 
-export function calculatePersonalValuesScores(responses) {
+function buildRecognitionScores(responses) {
   const dimensions = {};
   const subareas = {};
   for (const [subareaId, subarea] of Object.entries(personalValuesSubareas)) {
-    const questions = personalValuesQuestions.filter(q => q.subarea === subareaId);
+    const questions = personalValuesRecognitionQuestions.filter(q => q.subarea === subareaId);
     const average = avg(questions.map(q => responses[q.id]));
     const score = normalize(average);
     subareas[subareaId] = { name: subarea.name, dimension: subarea.dimension, average: Number(average.toFixed(2)), score, level: levelFromScore(score) };
@@ -83,11 +86,68 @@ export function calculatePersonalValuesScores(responses) {
     const score = normalize(average);
     dimensions[dimension.id] = { name: dimension.name, description: dimension.description, average: Number(average.toFixed(2)), score, level: levelFromScore(score), subareas: ids };
   }
+  return { dimensions, subareas };
+}
+
+function buildChoiceMap(responses) {
+  const priority = emptyCounts();
+  const pressure = emptyCounts();
+  const selectedValues = {};
+  for (const q of personalValuesQuestions.filter(q => q.type !== 'likert')) {
+    const selected = responses[q.id];
+    const dim = dimensionOfValue(selected);
+    if (!dim) continue;
+    selectedValues[q.id] = { question: q.text, phase: q.phase, context: q.context, value: selected, dimension: dim, label: q.options.find(o => o.value === selected)?.label };
+    if (q.phase === 'priority') priority[dim] += 1;
+    if (q.phase === 'pressure') pressure[dim] += 1;
+  }
+  return { priorityCounts: priority, pressureCounts: pressure, priorityRanking: rankCounts(priority), pressureRanking: rankCounts(pressure), selectedValues };
+}
+
+function buildCoherenceMap(dimensions, choiceMap) {
+  const declaredRanking = Object.entries(dimensions).map(([id, d]) => ({ id, name: d.name, score: d.score })).sort((a, b) => b.score - a.score);
+  const declaredTop = declaredRanking.slice(0, 3).map(v => v.id);
+  const priorityTop = choiceMap.priorityRanking.slice(0, 3).filter(v => v.count > 0).map(v => v.id);
+  const pressureTop = choiceMap.pressureRanking.slice(0, 3).filter(v => v.count > 0).map(v => v.id);
+  const alignmentHits = new Set([...priorityTop, ...pressureTop]);
+  const coherent = declaredTop.filter(id => alignmentHits.has(id));
+  const declaredButNotChosen = declaredTop.filter(id => !alignmentHits.has(id));
+  const chosenUnderPressureNotDeclared = pressureTop.filter(id => !declaredTop.includes(id));
+  const score = Math.round((coherent.length / Math.max(declaredTop.length, 1)) * 100);
+  return { score, declaredRanking, priorityRanking: choiceMap.priorityRanking, pressureRanking: choiceMap.pressureRanking, coherent, declaredButNotChosen, chosenUnderPressureNotDeclared };
+}
+
+function detectChoiceTensions(dimensions, coherenceMap) {
+  const tensions = [];
+  for (const id of coherenceMap.declaredButNotChosen) tensions.push({ id: 'valor_declarado_pouco_priorizado_' + id, label: 'Valor declarado pouco priorizado', severity: dimensions[id].score >= 82 ? 'alta' : 'moderada', evidence: { dimension: id, declaredScore: dimensions[id].score }, interpretation: 'Este valor aparece forte no reconhecimento, mas não aparece com a mesma força nas escolhas forçadas ou nos dilemas. Isso pode indicar distância entre ideal declarado e decisão sob pressão.' });
+  for (const id of coherenceMap.chosenUnderPressureNotDeclared) tensions.push({ id: 'valor_sob_pressao_' + id, label: 'Valor que governa sob pressão', severity: 'moderada', evidence: { dimension: id }, interpretation: 'Este valor não está entre os mais expressivos no reconhecimento, mas aparece nas decisões sob pressão. Pode ser um valor operacional que governa escolhas em momentos difíceis.' });
+  return tensions;
+}
+
+export function calculatePersonalValuesScores(responses) {
+  const { dimensions, subareas } = buildRecognitionScores(responses);
+  const choiceMap = buildChoiceMap(responses);
+  const coherenceMap = buildCoherenceMap(dimensions, choiceMap);
   const overallAverage = avg(Object.values(dimensions).map(d => d.average));
   const overallScore = normalize(overallAverage);
   const strongestDimension = Object.entries(dimensions).sort((a, b) => b[1].score - a[1].score)[0];
   const weakestDimension = Object.entries(dimensions).sort((a, b) => a[1].score - b[1].score)[0];
   const strongestSubarea = Object.entries(subareas).sort((a, b) => b[1].score - a[1].score)[0];
   const weakestSubarea = Object.entries(subareas).sort((a, b) => a[1].score - b[1].score)[0];
-  return { model: 'VP-6', scale: 'Likert 1-5 normalized to 0-100', overall: { average: Number(overallAverage.toFixed(2)), score: overallScore, level: levelFromScore(overallScore) }, dimensions, subareas, tensions: detectTensions(dimensions, subareas), synergies: detectSynergies(dimensions, subareas), highlights: { strongestDimension: { id: strongestDimension[0], ...strongestDimension[1] }, weakestDimension: { id: weakestDimension[0], ...weakestDimension[1] }, strongestSubarea: { id: strongestSubarea[0], ...strongestSubarea[1] }, weakestSubarea: { id: weakestSubarea[0], ...weakestSubarea[1] } } };
+  const matrixTensions = detectTensions(dimensions, subareas);
+  const choiceTensions = detectChoiceTensions(dimensions, coherenceMap);
+  return {
+    model: 'Mapa de Valores Pessoais',
+    version: 'MVP-3',
+    scale: 'Reconhecimento Likert 1-5 + escolhas forçadas + dilemas práticos',
+    overall: { average: Number(overallAverage.toFixed(2)), score: overallScore, level: levelFromScore(overallScore) },
+    dimensions,
+    subareas,
+    hierarchy: { declared: coherenceMap.declaredRanking, prioritized: choiceMap.priorityRanking, underPressure: choiceMap.pressureRanking },
+    choiceMap,
+    coherenceMap,
+    tensions: [...matrixTensions, ...choiceTensions],
+    synergies: detectSynergies(dimensions, subareas),
+    highlights: { strongestDimension: { id: strongestDimension[0], ...strongestDimension[1] }, weakestDimension: { id: weakestDimension[0], ...weakestDimension[1] }, strongestSubarea: { id: strongestSubarea[0], ...strongestSubarea[1] }, weakestSubarea: { id: weakestSubarea[0], ...weakestSubarea[1] } },
+  };
 }
