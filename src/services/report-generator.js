@@ -1,8 +1,6 @@
-import { PrismaClient } from '@prisma/client';
 import { config } from '../config/index.js';
 import { profileLabels } from '../data/disc-profiles.js';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma.js';
 
 export async function generateReport(assessmentId) {
   const assessment = await prisma.assessment.findUnique({
