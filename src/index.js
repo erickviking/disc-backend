@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { config } from './config/index.js';
+import { securityHeaders } from './middleware/security.js';
 import authRoutes from './routes/auth.js';
 import adminRoutes from './routes/admin.js';
 import { adminInviteRouter, publicInviteRouter } from './routes/invites.js';
@@ -10,6 +11,7 @@ import pdfRoutes from './routes/pdf.js';
 
 const app = express();
 
+app.use(securityHeaders);
 app.use(cors({ origin: config.corsOrigin, credentials: true }));
 app.use(express.json({ limit: '1mb' }));
 
