@@ -14,6 +14,16 @@ async function resolveToolSlugById(toolId) {
   return tool?.slug || getDefaultToolSlug();
 }
 
+async function generateReportInBackground({ assessmentId, handler, userEmail, userName }) {
+  try {
+    await handler.generateReport(assessmentId);
+    try { await sendReportReadyEmail(userEmail, userName, config.appUrl); }
+    catch (emailErr) { console.error('Email failed:', emailErr.message); }
+  } catch (reportErr) {
+    console.error('Background report generation error:', reportErr);
+  }
+}
+
 userAssessmentRouter.get('/questions', (req, res) => {
   const toolSlug = req.query.tool || getDefaultToolSlug();
   const handler = getToolHandler(toolSlug);
@@ -65,7 +75,10 @@ userAssessmentRouter.patch('/:id/responses', async (req, res) => {
 
 userAssessmentRouter.post('/:id/submit', async (req, res) => {
   try {
-    const assessment = await prisma.assessment.findUnique({ where: { id: req.params.id } });
+    const assessment = await prisma.assessment.findUnique({
+      where: { id: req.params.id },
+      include: { user: { select: { name: true, email: true } }, report: { select: { id: true, generatedAt: true } } },
+    });
     if (!assessment) return res.status(404).json({ error: 'Assessment nao encontrado' });
     if (assessment.userId !== req.user.id) return res.status(403).json({ error: 'Sem permissao' });
     if (assessment.status !== 'IN_PROGRESS') return res.status(400).json({ error: 'Assessment ja foi submetido' });
@@ -80,23 +93,19 @@ userAssessmentRouter.post('/:id/submit', async (req, res) => {
     const completed = await prisma.assessment.update({
       where: { id: assessment.id },
       data: { responses, scoresRaw: scoresData, profilePrimary, profileSecondary, status: 'COMPLETED', completedAt: new Date() },
+      include: { report: { select: { id: true, generatedAt: true } } },
     });
 
-    if (toolSlug === 'inteligencia-emocional') {
-      try {
-        await handler.generateReport(assessment.id);
-        const withReport = await prisma.assessment.findUnique({
-          where: { id: assessment.id },
-          include: { report: { select: { id: true, generatedAt: true } } },
-        });
-        return res.json({ assessment: withReport, message: 'Assessment concluido e relatorio gerado!' });
-      } catch (reportErr) {
-        console.error('Auto report generation error:', reportErr);
-        return res.status(202).json({ assessment: completed, message: 'Assessment concluido. Relatorio ainda nao foi gerado.' });
-      }
+    if (toolSlug === 'inteligencia-emocional' && !completed.report) {
+      setImmediate(() => generateReportInBackground({
+        assessmentId: assessment.id,
+        handler,
+        userEmail: assessment.user.email,
+        userName: assessment.user.name,
+      }));
     }
 
-    return res.json({ assessment: completed, message: 'Assessment concluido!' });
+    return res.json({ assessment: completed, message: toolSlug === 'inteligencia-emocional' ? 'Assessment concluido. Relatorio em geracao.' : 'Assessment concluido!' });
   } catch (err) {
     console.error('Submit assessment error:', err);
     return res.status(500).json({ error: err.message || 'Erro interno' });
