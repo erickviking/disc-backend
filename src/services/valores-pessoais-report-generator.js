@@ -6,16 +6,17 @@ function buildPrompt({ userName, scores, adminNotes }) {
   return `Você é uma especialista em valores pessoais, autoconhecimento, PNL aplicada, análise comportamental e desenvolvimento humano.
 
 IMPORTANTE:
+- Esta ferramenta se chama Mapa de Valores Pessoais.
 - Esta ferramenta é de autoconhecimento e desenvolvimento, não diagnóstico psicológico.
 - Fale diretamente com a pessoa usando "você".
 - Use linguagem profunda, prática, humana e acessível.
-- Não invente tensões ou conflitos que não estejam nos dados.
-- Use obrigatoriamente as tensões e sinergias fornecidas pelo sistema como base da interpretação.
-- Você pode humanizar, explicar e aplicar os dados à vida prática, mas não deve criar novas relações causais sem base nos scores.
+- Não invente tensões, sinergias ou conflitos que não estejam nos dados.
+- Use obrigatoriamente os rankings, tensões, sinergias, gaps de coerência e padrões sob pressão fornecidos pelo sistema.
+- O objetivo não é só dizer quais valores a pessoa tem. É mostrar: valores declarados, valores priorizados, valores sob pressão e coerência entre eles.
 - Evite dizer "baixo" no relatório final. Prefira: "menos expressivo", "pede atenção", "ainda pouco sustentado na prática", "precisa de estrutura".
 
 Nome da pessoa: ${userName}
-Modelo: VP-6 — Valores Pessoais
+Modelo: MVP-6 — Mapa de Valores Pessoais
 
 Dimensões:
 ${personalValuesDimensions.map(d => `- ${d.id}: ${d.name} — ${d.description}`).join('\n')}
@@ -23,7 +24,7 @@ ${personalValuesDimensions.map(d => `- ${d.id}: ${d.name} — ${d.description}`)
 Subáreas:
 ${Object.entries(personalValuesSubareas).map(([id, s]) => `- ${id}: ${s.name} (${s.dimension})`).join('\n')}
 
-Scores calculados deterministicamente pelo sistema:
+Scores, rankings e padrões calculados deterministicamente pelo sistema:
 ${JSON.stringify(scores, null, 2)}
 
 ${adminNotes ? `Contexto adicional da mentora:\n${adminNotes}\n` : ''}
@@ -32,13 +33,14 @@ Retorne SOMENTE JSON válido, sem markdown, sem crases, sem comentário antes ou
 
 Estrutura obrigatória:
 {
-  "resumoExecutivo": "3 a 5 frases com leitura geral dos valores pessoais",
-  "leituraCentral": "2 a 4 parágrafos explicando o padrão dominante de valores e decisões",
-  "valoresDominantes": [{"valor":"nome", "score":0, "leitura":"explicação prática", "comoUsarMelhor":"orientação objetiva"}],
-  "valoresQuePedemAtencao": [{"valor":"nome", "score":0, "leitura":"explicação prática", "riscoDeDesalinhamento":"como isso aparece", "acao":"ação objetiva"}],
+  "resumoExecutivo": "3 a 5 frases com leitura geral do mapa de valores",
+  "leituraCentral": "2 a 4 parágrafos explicando o padrão dominante entre valores declarados, priorizados e sob pressão",
+  "hierarquiaDeValores": [{"valor":"nome", "rank":1, "origem":"declarado|priorizado|sob_pressao", "leitura":"explicação prática"}],
+  "valoresSobPressao": [{"contexto":"oportunidade|conflito|medo|propósito|aprovação|sobrecarga|longo_prazo|mudança", "valorEscolhido":"nome", "leitura":"como isso aparece em decisões reais"}],
+  "mapaDeCoerencia": [{"valor":"nome", "coerencia":"alinhado|declarado_mas_pouco_escolhido|pouco_sustentado_mas_muito_escolhido", "leitura":"interpretação prática", "ajuste":"ação de alinhamento"}],
   "tensoesInternas": [{"tensao":"nome da tensão fornecida pelo sistema", "severidade":"moderada ou alta", "leitura":"explicação baseada nos dados", "comoAparece":"como aparece em decisões reais", "acaoDeAlinhamento":"ação prática"}],
   "sinergias": [{"sinergia":"nome da sinergia fornecida pelo sistema", "forca":"boa ou alta", "leitura":"explicação baseada nos dados", "comoPotencializar":"ação prática"}],
-  "impactoNasDecisoes": "Como esse sistema de valores tende a influenciar decisões importantes",
+  "impactoNasDecisoes": "Como esse mapa de valores tende a influenciar decisões importantes",
   "impactoNosRelacionamentos": "Como aparece em família, casamento, filhos, amizades ou vínculos importantes",
   "impactoNaProsperidade": "Como influencia dinheiro, expansão, segurança e construção material",
   "impactoNoProposito": "Como influencia sentido, espiritualidade, missão e legado",
@@ -48,7 +50,7 @@ Estrutura obrigatória:
 }
 
 function assertNarrativeShape(narrative) {
-  const required = ['resumoExecutivo','leituraCentral','valoresDominantes','valoresQuePedemAtencao','tensoesInternas','sinergias','impactoNasDecisoes','impactoNosRelacionamentos','impactoNaProsperidade','impactoNoProposito','planoDeAlinhamento30Dias','fraseFinal'];
+  const required = ['resumoExecutivo','leituraCentral','hierarquiaDeValores','valoresSobPressao','mapaDeCoerencia','tensoesInternas','sinergias','impactoNasDecisoes','impactoNosRelacionamentos','impactoNaProsperidade','impactoNoProposito','planoDeAlinhamento30Dias','fraseFinal'];
   for (const key of required) if (!(key in narrative)) throw new Error('Resposta da IA sem campo obrigatorio: ' + key);
   return narrative;
 }
@@ -56,7 +58,7 @@ function assertNarrativeShape(narrative) {
 export async function generatePersonalValuesReport(assessmentId) {
   const assessment = await prisma.assessment.findUnique({ where: { id: assessmentId }, include: { user: { select: { name: true } } } });
   if (!assessment) throw new Error('Assessment nao encontrado');
-  if (!assessment.scoresRaw?.dimensions) throw new Error('Assessment sem scores de valores pessoais');
+  if (!assessment.scoresRaw?.dimensions) throw new Error('Assessment sem scores do Mapa de Valores Pessoais');
   if (!config.anthropicApiKey) throw new Error('ANTHROPIC_API_KEY nao configurada');
 
   const prompt = buildPrompt({ userName: assessment.user.name, scores: assessment.scoresRaw, adminNotes: assessment.adminNotes });
