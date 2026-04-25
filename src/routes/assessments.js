@@ -77,11 +77,26 @@ userAssessmentRouter.post('/:id/submit', async (req, res) => {
     if (validationError) return res.status(400).json({ error: validationError });
 
     const { scoresData, profilePrimary, profileSecondary } = handler.calculateScores(responses);
-    const updated = await prisma.assessment.update({
+    const completed = await prisma.assessment.update({
       where: { id: assessment.id },
       data: { responses, scoresRaw: scoresData, profilePrimary, profileSecondary, status: 'COMPLETED', completedAt: new Date() },
     });
-    return res.json({ assessment: updated, message: 'Assessment concluido!' });
+
+    if (toolSlug === 'inteligencia-emocional') {
+      try {
+        await handler.generateReport(assessment.id);
+        const withReport = await prisma.assessment.findUnique({
+          where: { id: assessment.id },
+          include: { report: { select: { id: true, generatedAt: true } } },
+        });
+        return res.json({ assessment: withReport, message: 'Assessment concluido e relatorio gerado!' });
+      } catch (reportErr) {
+        console.error('Auto report generation error:', reportErr);
+        return res.status(202).json({ assessment: completed, message: 'Assessment concluido. Relatorio ainda nao foi gerado.' });
+      }
+    }
+
+    return res.json({ assessment: completed, message: 'Assessment concluido!' });
   } catch (err) {
     console.error('Submit assessment error:', err);
     return res.status(500).json({ error: err.message || 'Erro interno' });
