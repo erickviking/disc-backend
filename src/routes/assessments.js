@@ -7,7 +7,7 @@ import { getDefaultToolSlug, getToolHandler } from '../tools/registry.js';
 
 const userAssessmentRouter = Router();
 userAssessmentRouter.use(authenticate);
-const autoGenerateReportTools = new Set(['inteligencia-emocional', 'valores-pessoais', 'metas-smart']);
+const autoGenerateReportTools = new Set(['inteligencia-emocional', 'valores-pessoais', 'metas-smart', 'sabotadores']);
 
 async function resolveToolSlugById(toolId) {
   if (!toolId) return getDefaultToolSlug();
