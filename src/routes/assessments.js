@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { authenticate, requireAdmin } from '../middleware/auth.js';
 import { calculateDiscScores, validateResponses } from '../services/disc-scoring.js';
 import { calculateRodaDaVidaScores, validateRodaDaVidaResponses } from '../services/roda-da-vida-scoring.js';
@@ -9,8 +8,7 @@ import { generateReport } from '../services/report-generator.js';
 import { generateRodaDaVidaReport } from '../services/roda-da-vida-report-generator.js';
 import { sendReportReadyEmail } from '../services/email.js';
 import { config } from '../config/index.js';
-
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma.js';
 
 const userAssessmentRouter = Router();
 userAssessmentRouter.use(authenticate);
@@ -143,13 +141,10 @@ adminAssessmentRouter.get('/', async (req, res) => {
       const toolRecord = await prisma.tool.findUnique({ where: { slug: toolSlug } });
       if (toolRecord) where.toolId = toolRecord.id;
     }
-    if (toolSlug) {
-      const toolRecord = await prisma.tool.findUnique({ where: { slug: toolSlug } });
-      if (toolRecord) where.toolId = toolRecord.id;
-    }
     const [assessments, total] = await Promise.all([
       prisma.assessment.findMany({
-        where, select: { id: true, status: true, profilePrimary: true, profileSecondary: true, scoresRaw: true, adminNotes: true, completedAt: true, releasedAt: true, createdAt: true, tool: { select: { slug: true, name: true } }, tool: { select: { slug: true, name: true } }, user: { select: { id: true, name: true, email: true } }, report: { select: { id: true, generatedAt: true } } },
+        where,
+        select: { id: true, status: true, profilePrimary: true, profileSecondary: true, scoresRaw: true, adminNotes: true, completedAt: true, releasedAt: true, createdAt: true, tool: { select: { slug: true, name: true } }, user: { select: { id: true, name: true, email: true } }, report: { select: { id: true, generatedAt: true } } },
         orderBy: { createdAt: 'desc' }, skip, take: limitNum,
       }),
       prisma.assessment.count({ where }),
