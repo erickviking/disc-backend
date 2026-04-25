@@ -6,6 +6,15 @@ import { prisma } from '../lib/prisma.js';
 const router = Router();
 router.use(authenticate);
 
+function slugify(value) {
+  return String(value || 'relatorio')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 // GET /api/reports/:assessmentId/pdf
 router.get('/:assessmentId/pdf', async (req, res) => {
   try {
@@ -14,27 +23,30 @@ router.get('/:assessmentId/pdf', async (req, res) => {
       include: {
         user: { select: { id: true, name: true } },
         report: true,
+        tool: { select: { slug: true, name: true } },
       },
     });
 
     if (!assessment) return res.status(404).json({ error: 'Assessment nao encontrado' });
     if (!assessment.report) return res.status(404).json({ error: 'Relatorio nao gerado' });
 
-    // Allow user to see own report or admin to see any
     if (assessment.userId !== req.user.id && req.user.role !== 'ADMIN') {
       return res.status(403).json({ error: 'Sem permissao' });
     }
 
-    const scores = assessment.scoresRaw?.normalized;
-    const pdfBuffer = await generatePDF(
-      assessment.report,
-      scores,
-      assessment.profilePrimary,
-      assessment.profileSecondary,
-      assessment.user.name
-    );
+    const toolSlug = assessment.tool?.slug || 'disc';
+    const pdfBuffer = await generatePDF({
+      report: assessment.report,
+      scoresRaw: assessment.scoresRaw,
+      scores: assessment.scoresRaw?.normalized || assessment.scoresRaw?.scores || assessment.scoresRaw?.dimensions || {},
+      profilePrimary: assessment.profilePrimary,
+      profileSecondary: assessment.profileSecondary,
+      userName: assessment.user.name,
+      toolSlug,
+      toolName: assessment.tool?.name || 'Relatorio',
+    });
 
-    const filename = 'relatorio-disc-' + assessment.user.name.toLowerCase().replace(/\s+/g, '-') + '.pdf';
+    const filename = 'relatorio-' + slugify(toolSlug) + '-' + slugify(assessment.user.name) + '.pdf';
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename="' + filename + '"');
