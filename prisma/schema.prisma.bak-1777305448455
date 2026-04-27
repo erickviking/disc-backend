@@ -38,7 +38,6 @@ model User {
   inviter       User?            @relation("InvitedUsers", fields: [invitedBy], references: [id])
   invitedUsers  User[]           @relation("InvitedUsers")
   toolAccess    UserToolAccess[]
-  subscription  Subscription?
 
   @@map("users")
 }
@@ -142,24 +141,4 @@ model PromptTemplate {
   tool      Tool?    @relation(fields: [toolId], references: [id])
 
   @@map("prompt_templates")
-}
-
-
-model Subscription {
-  id              String    @id @default(cuid())
-  userId          String    @unique
-  hotmartEmail    String    // email usado na compra Hotmart
-  hotmartCode     String?   // código da transação
-  subscriptionId  String?   // ID da assinatura na Hotmart
-  status          String    @default("ACTIVE") // ACTIVE, CANCELLED, EXPIRED, REFUNDED
-  plan            String    @default("ANNUAL") // ANNUAL
-  startedAt       DateTime  @default(now())
-  expiresAt       DateTime?
-  cancelledAt     DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("subscriptions")
 }

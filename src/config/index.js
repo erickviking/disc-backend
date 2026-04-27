@@ -23,6 +23,7 @@ if (isProduction && !optionalEnv('DATABASE_URL')) {
 }
 
 export const config = {
+  hotmartHottok: process.env.HOTMART_HOTTOK,
   port: process.env.PORT || 3001,
   env: process.env.NODE_ENV || 'development',
   isProduction,
