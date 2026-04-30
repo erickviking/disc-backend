@@ -111,6 +111,37 @@ adminAssessmentRouter.get('/', async (req, res) => {
 adminAssessmentRouter.get('/:id', async (req, res) => { try { const assessment = await prisma.assessment.findUnique({ where: { id: req.params.id }, include: { user: { select: { id: true, name: true, email: true, phone: true } }, report: true } }); if (!assessment) return res.status(404).json({ error: 'Assessment nao encontrado' }); return res.json({ assessment }); } catch (err) { console.error(err); return res.status(500).json({ error: 'Erro interno' }); } });
 adminAssessmentRouter.patch('/:id/release', async (req, res) => { try { const assessment = await prisma.assessment.findUnique({ where: { id: req.params.id }, include: { report: true, user: { select: { name: true, email: true } } } }); if (!assessment) return res.status(404).json({ error: 'Assessment nao encontrado' }); if (assessment.status === 'IN_PROGRESS') return res.status(400).json({ error: 'Assessment ainda nao foi completado' }); const { adminNotes } = req.body || {}; const updated = await prisma.assessment.update({ where: { id: assessment.id }, data: { status: 'RELEASED', releasedAt: new Date(), adminNotes: adminNotes || assessment.adminNotes }, include: { report: true, user: { select: { name: true, email: true } } } }); return res.json({ assessment: updated, message: 'Assessment liberado! Agora gere o relatorio.' }); } catch (err) { console.error(err); return res.status(500).json({ error: 'Erro interno' }); } });
 adminAssessmentRouter.post('/:id/generate-report', async (req, res) => { try { const assessment = await prisma.assessment.findUnique({ where: { id: req.params.id }, include: { report: true, user: { select: { name: true, email: true } } } }); if (!assessment) return res.status(404).json({ error: 'Assessment nao encontrado' }); if (assessment.report) return res.status(400).json({ error: 'Relatorio ja existe' }); if (assessment.status === 'IN_PROGRESS') return res.status(400).json({ error: 'Assessment ainda nao foi completado' }); const toolSlug = await resolveToolSlugById(assessment.toolId); const handler = getToolHandler(toolSlug); await handler.generateReport(assessment.id); try { await sendReportReadyEmail(assessment.user.email, assessment.user.name, config.appUrl); } catch (emailErr) { console.error('Email failed:', emailErr.message); } const updated = await prisma.assessment.findUnique({ where: { id: assessment.id }, include: { report: true, user: { select: { name: true, email: true } } } }); return res.json({ assessment: updated, message: 'Relatorio gerado e email enviado!' }); } catch (err) { console.error('Generate report error:', err); return res.status(500).json({ error: 'Erro ao gerar relatorio: ' + err.message }); } });
+adminAssessmentRouter.post('/bulk-release', async (req, res) => {
+  try {
+    const { toolSlug } = req.body || {};
+    const where = { status: { in: ['COMPLETED', 'REVIEWED'] } };
+    if (toolSlug) {
+      const tool = await prisma.tool.findUnique({ where: { slug: toolSlug } });
+      if (!tool) return res.status(404).json({ error: 'Ferramenta nao encontrada' });
+      where.toolId = tool.id;
+    }
+    const pending = await prisma.assessment.findMany({
+      where,
+      include: { user: { select: { name: true, email: true } }, report: { select: { id: true } } }
+    });
+    if (pending.length === 0) return res.json({ released: 0, generating: 0, message: 'Nenhum assessment pendente.' });
+    await prisma.assessment.updateMany({
+      where: { id: { in: pending.map(a => a.id) } },
+      data: { status: 'RELEASED', releasedAt: new Date() }
+    });
+    const toGenerate = pending.filter(a => !a.report);
+    const handlerCache = new Map();
+    for (const a of toGenerate) {
+      try {
+        const slug = toolSlug || await resolveToolSlugById(a.toolId);
+        let handler = handlerCache.get(slug);
+        if (!handler) { handler = getToolHandler(slug); handlerCache.set(slug, handler); }
+        setImmediate(() => generateReportInBackground({ assessmentId: a.id, handler, userEmail: a.user.email, userName: a.user.name }));
+      } catch (e) { console.error('Skipping assessment ' + a.id + ':', e.message); }
+    }
+    return res.json({ released: pending.length, generating: toGenerate.length, message: pending.length + ' liberado(s), ' + toGenerate.length + ' relatorio(s) em geracao.' });
+  } catch (err) { console.error('Bulk release error:', err); return res.status(500).json({ error: 'Erro interno' }); }
+});
 adminAssessmentRouter.delete('/:id', async (req, res) => { try { const assessment = await prisma.assessment.findUnique({ where: { id: req.params.id }, include: { report: true } }); if (!assessment) return res.status(404).json({ error: 'Assessment nao encontrado' }); if (assessment.report) await prisma.report.delete({ where: { id: assessment.report.id } }); await prisma.assessment.delete({ where: { id: req.params.id } }); return res.json({ message: 'Assessment deletado' }); } catch (err) { console.error(err); return res.status(500).json({ error: 'Erro interno' }); } });
 adminAssessmentRouter.get('/:id/report', async (req, res) => { try { const assessment = await prisma.assessment.findUnique({ where: { id: req.params.id }, include: { user: { select: { name: true, email: true } }, report: true } }); if (!assessment) return res.status(404).json({ error: 'Assessment nao encontrado' }); if (!assessment.report) return res.status(404).json({ error: 'Relatorio nao gerado' }); return res.json({ report: assessment.report, scores: assessment.scoresRaw?.normalized || assessment.scoresRaw?.scores, scoresRaw: assessment.scoresRaw, profilePrimary: assessment.profilePrimary, profileSecondary: assessment.profileSecondary, userName: assessment.user.name }); } catch (err) { console.error(err); return res.status(500).json({ error: 'Erro interno' }); } });
 
