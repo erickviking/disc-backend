@@ -2,6 +2,59 @@ import { config } from '../config/index.js';
 import { profileLabels } from '../data/disc-profiles.js';
 import { prisma } from '../lib/prisma.js';
 
+const VALID_DISC = ['D', 'I', 'S', 'C'];
+const REQUIRED_DIMENSIONS = ['executor', 'comunicador', 'planejador', 'analista'];
+const DIMENSION_FIELDS = ['analise', 'padraoForte', 'pontoDeAtencao', 'comportamentoTipico'];
+
+function isNonEmptyString(v) { return typeof v === 'string' && v.trim().length > 0; }
+
+function validateDiscNarrative(n) {
+  if (!n || typeof n !== 'object') return 'narrative ausente ou nao-objeto';
+  if (!VALID_DISC.includes(n.perfilPrimario)) return 'perfilPrimario invalido';
+  if (!VALID_DISC.includes(n.perfilSecundario)) return 'perfilSecundario invalido';
+  if (!isNonEmptyString(n.resumoExecutivo)) return 'resumoExecutivo ausente/vazio';
+  if (!isNonEmptyString(n.leituraCentral)) return 'leituraCentral ausente/vazio';
+
+  if (!n.dimensoes || typeof n.dimensoes !== 'object') return 'dimensoes ausente';
+  const dimKeys = Object.keys(n.dimensoes);
+  if (dimKeys.length !== 4) return 'dimensoes precisa ter exatamente 4 chaves (tem ' + dimKeys.length + ')';
+  for (const d of REQUIRED_DIMENSIONS) {
+    if (!n.dimensoes[d]) return 'dimensao "' + d + '" ausente';
+    for (const f of DIMENSION_FIELDS) {
+      if (!isNonEmptyString(n.dimensoes[d][f])) return 'dimensoes.' + d + '.' + f + ' ausente/vazio';
+    }
+  }
+
+  if (!Array.isArray(n.pontosFortes) || n.pontosFortes.length < 3) return 'pontosFortes deve ser array com >=3 itens';
+  for (let i = 0; i < n.pontosFortes.length; i++) {
+    const p = n.pontosFortes[i];
+    if (!isNonEmptyString(p?.titulo) || !isNonEmptyString(p?.descricao)) return 'pontosFortes[' + i + '] sem titulo/descricao';
+  }
+  if (!Array.isArray(n.areasAtencao) || n.areasAtencao.length < 3) return 'areasAtencao deve ser array com >=3 itens';
+  for (let i = 0; i < n.areasAtencao.length; i++) {
+    const a = n.areasAtencao[i];
+    if (!isNonEmptyString(a?.titulo) || !isNonEmptyString(a?.descricao)) return 'areasAtencao[' + i + '] sem titulo/descricao';
+  }
+
+  if (!isNonEmptyString(n.padroesEmPressao)) return 'padroesEmPressao ausente/vazio';
+  if (!isNonEmptyString(n.impactoNosRelacionamentos)) return 'impactoNosRelacionamentos ausente/vazio';
+
+  if (!Array.isArray(n.planoDeDesenvolvimento30Dias) || n.planoDeDesenvolvimento30Dias.length !== 4) {
+    return 'planoDeDesenvolvimento30Dias deve ter exatamente 4 itens';
+  }
+  const semanas = n.planoDeDesenvolvimento30Dias.map(w => w?.semana).sort();
+  if (JSON.stringify(semanas) !== '[1,2,3,4]') return 'planoDeDesenvolvimento30Dias precisa cobrir semanas 1-4';
+  for (let i = 0; i < 4; i++) {
+    const w = n.planoDeDesenvolvimento30Dias[i];
+    if (!isNonEmptyString(w?.foco)) return 'planoDeDesenvolvimento30Dias[' + i + '].foco ausente';
+    if (!isNonEmptyString(w?.pratica)) return 'planoDeDesenvolvimento30Dias[' + i + '].pratica ausente';
+    if (!isNonEmptyString(w?.indicador)) return 'planoDeDesenvolvimento30Dias[' + i + '].indicador ausente';
+  }
+
+  if (!isNonEmptyString(n.fraseFinal)) return 'fraseFinal ausente/vazio';
+  return null;
+}
+
 export async function generateReport(assessmentId) {
   const assessment = await prisma.assessment.findUnique({
     where: { id: assessmentId },
@@ -22,66 +75,70 @@ export async function generateReport(assessmentId) {
   const profilePLabel = profileLabels[assessment.profilePrimary]?.name || assessment.profilePrimary;
   const profileSLabel = profileLabels[assessment.profileSecondary]?.name || assessment.profileSecondary;
 
-  const prompt = `Voce e um especialista em analise comportamental DISC com ampla experiencia em coaching, desenvolvimento humano e mentoria profissional. Voce trabalha com a mentora Vanessa Rocha.
+  const prompt = `Você é especialista em análise comportamental DISC. Trabalhe com tom TÉCNICO, OBJETIVO e COMPORTAMENTAL — sem psicologismo, sem warmth forçada, sem afirmações afetivas genéricas.
 
-Os perfis DISC sao nomeados assim:
-- D = Executor (focado em resultados, decisivo, direto)
-- I = Comunicador (sociavel, entusiasmado, persuasivo)
-- S = Planejador (estavel, paciente, colaborativo)
-- C = Analista (preciso, analitico, criterioso)
+LINGUAGEM:
+- USE: "Perfil indica padrão decisório orientado a dados", "Padrão observado: priorização de precisão sobre velocidade", "Em ambientes de pressão, perfis Executores tendem a..."
+- NÃO USE: "Você é uma pessoa especial", "Sua jornada de autoconhecimento", "Cuide-se, você merece"
 
-## Dados do Avaliado
+PERFIS DISC:
+- D = Executor (foco em resultado, decisão rápida, direto)
+- I = Comunicador (sociável, persuasivo, expressivo)
+- S = Planejador (estável, paciente, colaborativo)
+- C = Analista (preciso, analítico, criterioso)
+
+DADOS DO AVALIADO:
 - Nome: ${assessment.user.name}
-- Perfil Primario: ${profilePLabel} (${assessment.profilePrimary})
-- Perfil Secundario: ${profileSLabel} (${assessment.profileSecondary})
-- Scores normalizados: Executor=${scores.D}%, Comunicador=${scores.I}%, Planejador=${scores.S}%, Analista=${scores.C}%
+- Perfil Primário: ${profilePLabel} (${assessment.profilePrimary})
+- Perfil Secundário: ${profileSLabel} (${assessment.profileSecondary})
+- Scores normalizados: D=${scores.D}%, I=${scores.I}%, S=${scores.S}%, C=${scores.C}%
 - Scores brutos: D=${raw.D}, I=${raw.I}, S=${raw.S}, C=${raw.C}
 
 ${assessment.adminNotes ? '## Contexto adicional do coach\n' + assessment.adminNotes : ''}
 
-## Instrucoes
-Gere uma analise comportamental completa e personalizada. Retorne SOMENTE um JSON valido (sem markdown, sem backticks) com esta estrutura:
+INSTRUÇÕES:
+Gere análise comportamental técnica e detalhada. Retorne SOMENTE JSON válido (sem markdown, sem backticks) com esta estrutura EXATA:
 
 {
-  "resumoExecutivo": "Paragrafo de 3-4 frases resumindo o perfil geral de forma acolhedora e precisa",
-  "perfilDetalhado": {
-    "descricao": "Descricao detalhada de 2-3 paragrafos do perfil comportamental, considerando a combinacao dos fatores",
-    "palavrasChave": ["5-8 palavras que definem este perfil"]
+  "perfilPrimario": "D|I|S|C",
+  "perfilSecundario": "D|I|S|C",
+  "resumoExecutivo": "3-5 frases técnicas resumindo o perfil. Comece sempre com 'Perfil [Nome]/[Nome] indica...' ou 'Padrão observado:'",
+  "leituraCentral": "2-3 parágrafos analíticos sobre o perfil dominante e como a combinação primário/secundário se manifesta comportamentalmente",
+  "dimensoes": {
+    "executor": {
+      "analise": "2-3 parágrafos específicos sobre como esta dimensão se manifesta neste perfil",
+      "padraoForte": "frase curta sobre força comportamental nesta dimensão",
+      "pontoDeAtencao": "frase curta sobre risco/limitação nesta dimensão",
+      "comportamentoTipico": "como esta dimensão se manifesta em situações cotidianas"
+    },
+    "comunicador": { "analise": "...", "padraoForte": "...", "pontoDeAtencao": "...", "comportamentoTipico": "..." },
+    "planejador": { "analise": "...", "padraoForte": "...", "pontoDeAtencao": "...", "comportamentoTipico": "..." },
+    "analista": { "analise": "...", "padraoForte": "...", "pontoDeAtencao": "...", "comportamentoTipico": "..." }
   },
   "pontosFortes": [
-    {"titulo": "Nome do ponto forte", "descricao": "Explicacao pratica de 1-2 frases"}
+    {"titulo": "Nome do ponto forte", "descricao": "Explicação técnica de 1-2 frases"}
   ],
   "areasAtencao": [
-    {"titulo": "Nome da area", "descricao": "Explicacao construtiva de 1-2 frases"}
+    {"titulo": "Nome da área", "descricao": "Explicação construtiva de 1-2 frases"}
   ],
-  "estiloComunicacao": {
-    "comoSeExprime": "Como essa pessoa tende a se comunicar (2-3 frases)",
-    "comoPrefereceber": "Como prefere receber informacoes (2-3 frases)",
-    "dicasParaOutros": "Dicas para quem se comunica com esse perfil (2-3 frases)"
-  },
-  "ambiente": {
-    "idealDeTrabalho": "Descricao do ambiente ideal (2-3 frases)",
-    "fatoresEstresse": "O que causa estresse nesse perfil (2-3 frases)",
-    "comoLidaComMudancas": "Como reage a mudancas (1-2 frases)"
-  },
-  "lideranca": {
-    "estilo": "Estilo de lideranca natural (2-3 frases)",
-    "comoMotiva": "Como motiva outras pessoas (1-2 frases)"
-  },
-  "desenvolvimento": {
-    "recomendacoes": ["3-5 recomendacoes especificas de desenvolvimento"],
-    "acoesPraticas": ["3 acoes praticas que pode implementar imediatamente"]
-  }
+  "padroesEmPressao": "1-2 parágrafos analíticos sobre como este perfil reage sob pressão, prazo, crítica, conflito. Use linguagem comportamental, não psicológica.",
+  "impactoNosRelacionamentos": "1-2 parágrafos sobre como este perfil afeta dinâmicas profissionais, lideranças, conversas difíceis, trabalho em equipe.",
+  "planoDeDesenvolvimento30Dias": [
+    {"semana": 1, "foco": "área de foco da semana", "pratica": "prática concreta", "indicador": "como medir progresso"},
+    {"semana": 2, "foco": "...", "pratica": "...", "indicador": "..."},
+    {"semana": 3, "foco": "...", "pratica": "...", "indicador": "..."},
+    {"semana": 4, "foco": "...", "pratica": "...", "indicador": "..."}
+  ],
+  "fraseFinal": "aforismo memorável, técnico, não afetivo. Algo como: 'Padrões comportamentais não são prisão — são ponto de partida para escolhas conscientes.'"
 }
 
-REGRAS IMPORTANTES:
-- Use linguagem acolhedora, construtiva e profissional
-- DISC e ferramenta comportamental, NAO faca diagnosticos psicologicos
-- Seja especifico e pratico, evite generalidades
-- Considere a COMBINACAO dos fatores, nao cada score isoladamente
-- Fale diretamente com a pessoa usando "voce"
-- Gere exatamente 5 pontos fortes e 3-4 areas de atencao
-- Retorne SOMENTE o JSON, sem nenhum texto antes ou depois`;
+REGRAS:
+- Análises por dimensão devem ser DIFERENTES para cada uma (não copiar texto entre executor/comunicador/planejador/analista)
+- Gere EXATAMENTE 5 pontos fortes e 4 áreas de atenção
+- Mantenha tom técnico em todos os campos
+- Considere a COMBINAÇÃO primário+secundário, não cada score isoladamente
+- DISC é ferramenta comportamental — NÃO faça diagnóstico psicológico
+- Retorne SOMENTE o JSON, sem texto antes ou depois`;
 
   if (!config.anthropicApiKey) {
     throw new Error('ANTHROPIC_API_KEY nao configurada no .env');
@@ -98,7 +155,7 @@ REGRAS IMPORTANTES:
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 4000,
+      max_tokens: 8000,
       messages: [{ role: 'user', content: prompt }],
     }),
   });
@@ -120,6 +177,15 @@ REGRAS IMPORTANTES:
   } catch (e) {
     console.error('Failed to parse AI response:', rawText.substring(0, 500));
     throw new Error('Erro ao processar resposta da IA');
+  }
+
+  // Validação de shape (aborta antes de salvar Report)
+  const validationError = validateDiscNarrative(narrative);
+  if (validationError) {
+    console.error('Validação de shape falhou:', validationError, narrative);
+    const err = new Error('A IA retornou um relatório incompleto e não pôde ser salvo (faltou: ' + validationError + '). Clique novamente em Regerar para tentar de novo.');
+    err.statusCode = 422;
+    throw err;
   }
 
   // Salvar relatório
