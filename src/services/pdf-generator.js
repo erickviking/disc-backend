@@ -1,4 +1,5 @@
 import puppeteer from 'puppeteer';
+import { calcularCompetencias, calcularQuadrante, QUADRANTES_LABELS } from '../utils/competencias-disc.js';
 
 const discColors = { D: '#E63946', I: '#F4A261', S: '#2A9D8F', C: '#264653' };
 const discNames = { D: 'Executor', I: 'Comunicador', S: 'Planejador', C: 'Analista' };
@@ -26,6 +27,76 @@ function buildDiscRadar(scores = {}) {
   factors.forEach((f, i) => { const p = dataPoints[i], lp = getPoint(angles[i], 125); svg += '<circle cx="' + p.x + '" cy="' + p.y + '" r="5" fill="' + discColors[f] + '"/>'; svg += '<text x="' + lp.x + '" y="' + lp.y + '" text-anchor="middle" dominant-baseline="middle" font-size="11" font-weight="700" fill="' + discColors[f] + '">' + discNames[f] + '</text>'; svg += '<text x="' + lp.x + '" y="' + (lp.y + 14) + '" text-anchor="middle" font-size="10" fill="#6b7280">' + (scores[f] || 0) + '%</text>'; });
   return svg + '</svg>';
 }
+function buildCompetenciasRadar(scores) {
+  const competencias = calcularCompetencias(scores);
+  const size = 360, center = size / 2, radius = 110, n = competencias.length;
+  const angles = competencias.map((_, i) => (Math.PI * 2 * i) / n - Math.PI / 2);
+  const getPoint = (angle, value) => ({
+    x: center + Math.cos(angle) * (radius * value / 100),
+    y: center + Math.sin(angle) * (radius * value / 100),
+  });
+  const labelDist = 130;
+
+  let svg = '<svg viewBox="0 0 ' + size + ' ' + size + '" xmlns="http://www.w3.org/2000/svg" width="300" height="300">';
+  // Grid concêntrico (4 níveis)
+  [25, 50, 75, 100].forEach(v => {
+    const pts = angles.map(a => { const p = getPoint(a, v); return p.x + ',' + p.y; }).join(' ');
+    svg += '<polygon points="' + pts + '" fill="none" stroke="#e5e7eb" stroke-width="1"/>';
+  });
+  // Linhas radiais
+  angles.forEach(a => {
+    const p = getPoint(a, 100);
+    svg += '<line x1="' + center + '" y1="' + center + '" x2="' + p.x + '" y2="' + p.y + '" stroke="#e5e7eb" stroke-width="1"/>';
+  });
+  // Polígono de dados (dourado)
+  const dataPoints = competencias.map((c, i) => getPoint(angles[i], c.score));
+  svg += '<polygon points="' + dataPoints.map(p => p.x + ',' + p.y).join(' ') + '" fill="rgba(212,168,83,0.18)" stroke="#d4a853" stroke-width="2.5"/>';
+  // Pontos + labels + score por eixo
+  competencias.forEach((c, i) => {
+    const p = dataPoints[i];
+    const lp = { x: center + Math.cos(angles[i]) * labelDist, y: center + Math.sin(angles[i]) * labelDist };
+    svg += '<circle cx="' + p.x + '" cy="' + p.y + '" r="4" fill="#d4a853"/>';
+    svg += '<text x="' + lp.x + '" y="' + lp.y + '" text-anchor="middle" dominant-baseline="middle" font-size="10" font-weight="600" fill="#6b7280">' + esc(c.nome) + '</text>';
+    svg += '<text x="' + lp.x + '" y="' + (lp.y + 12) + '" text-anchor="middle" dominant-baseline="middle" font-size="9" fill="#9ca3af">' + esc(c.score) + '</text>';
+  });
+  return svg + '</svg>';
+}
+
+function buildQuadranteMap(scores) {
+  const q = calcularQuadrante(scores);
+  const size = 360, center = size / 2, half = 120;
+  const px = center + q.x * (half / 100);
+  const py = center - q.y * (half / 100); // Y do quadrante cresce para CIMA; SVG cresce para BAIXO
+
+  let svg = '<svg viewBox="0 0 ' + size + ' ' + size + '" xmlns="http://www.w3.org/2000/svg" width="300" height="300">';
+  // Moldura quadrada (área do plot)
+  svg += '<rect x="' + (center - half) + '" y="' + (center - half) + '" width="' + (half * 2) + '" height="' + (half * 2) + '" fill="none" stroke="#f3f4f6" stroke-width="1"/>';
+  // Eixos (cruzando no centro)
+  svg += '<line x1="' + (center - half) + '" y1="' + center + '" x2="' + (center + half) + '" y2="' + center + '" stroke="#d4d4d4" stroke-width="1"/>';
+  svg += '<line x1="' + center + '" y1="' + (center - half) + '" x2="' + center + '" y2="' + (center + half) + '" stroke="#d4d4d4" stroke-width="1"/>';
+  // Labels das pontas dos eixos (offset 12 para não colidir com ponto em extremos).
+  // dominant-baseline default (alphabetic) usado em "+I" e Q3/Q4 — funciona, mas é
+  // levemente inconsistente com "hanging" usado em "-C", Q1 e Q2. Dívida visual.
+  svg += '<text x="' + (center + half + 12) + '" y="' + center + '" text-anchor="start" dominant-baseline="middle" font-size="9" font-weight="700" fill="#9ca3af">+D</text>';
+  svg += '<text x="' + (center - half - 12) + '" y="' + center + '" text-anchor="end" dominant-baseline="middle" font-size="9" font-weight="700" fill="#9ca3af">-S</text>';
+  svg += '<text x="' + center + '" y="' + (center - half - 12) + '" text-anchor="middle" font-size="9" font-weight="700" fill="#9ca3af">+I</text>';
+  svg += '<text x="' + center + '" y="' + (center + half + 12) + '" text-anchor="middle" dominant-baseline="hanging" font-size="9" font-weight="700" fill="#9ca3af">-C</text>';
+  // Labels dos 4 quadrantes (cantos internos da moldura)
+  const qOff = 6;
+  svg += '<text x="' + (center + half - qOff) + '" y="' + (center - half + qOff) + '" text-anchor="end" dominant-baseline="hanging" font-size="9" fill="#6b7280">' + esc(QUADRANTES_LABELS.Q1) + '</text>';
+  svg += '<text x="' + (center - half + qOff) + '" y="' + (center - half + qOff) + '" text-anchor="start" dominant-baseline="hanging" font-size="9" fill="#6b7280">' + esc(QUADRANTES_LABELS.Q2) + '</text>';
+  svg += '<text x="' + (center - half + qOff) + '" y="' + (center + half - qOff) + '" text-anchor="start" font-size="9" fill="#6b7280">' + esc(QUADRANTES_LABELS.Q3) + '</text>';
+  svg += '<text x="' + (center + half - qOff) + '" y="' + (center + half - qOff) + '" text-anchor="end" font-size="9" fill="#6b7280">' + esc(QUADRANTES_LABELS.Q4) + '</text>';
+  // Linhas pontilhadas do ponto até os eixos
+  svg += '<line x1="' + px + '" y1="' + py + '" x2="' + center + '" y2="' + py + '" stroke="#d4d4d4" stroke-width="1" stroke-dasharray="2,2"/>';
+  svg += '<line x1="' + px + '" y1="' + py + '" x2="' + px + '" y2="' + center + '" stroke="#d4d4d4" stroke-width="1" stroke-dasharray="2,2"/>';
+  // Ponto da pessoa
+  svg += '<circle cx="' + px + '" cy="' + py + '" r="8" fill="#d4a853" stroke="#fff" stroke-width="2"/>';
+  // Nome do quadrante centralizado abaixo da moldura
+  svg += '<text x="' + center + '" y="' + (center + half + 28) + '" text-anchor="middle" dominant-baseline="middle" font-size="11" font-weight="700" fill="#d4a853">' + esc(q.quadranteLabel) + '</text>';
+  return svg + '</svg>';
+}
+
 function buildRodaBars(scores = {}) { return buildBars(Object.entries(scores).map(([id, score]) => ({ label: rodaAreaLabels[id] || id, score: Math.round(Number(score || 0) * 10), color: rodaAreaColors[id] || '#d4a853' }))); }
 function buildIEBars(dimensions = {}) { return buildBars(Object.entries(dimensions).map(([id, d]) => ({ label: d.name || id, score: d.score || 0, color: ieDimensionColors[id] || '#d4a853' }))); }
 function buildValoresBars(dimensions = {}) { return buildBars(Object.entries(dimensions).map(([id, d]) => ({ label: d.name || id, score: d.score || 0, color: valoresDimensionColors[id] || '#d4a853' }))); }
@@ -89,6 +160,8 @@ function buildDiscNewHTML({ report, scores, profilePrimary, profileSecondary, us
   ).join('');
 
   const body = '<div class="section" style="text-align:center;">' + buildDiscRadar(scores || {}) + '</div>'
+    + '<div class="section card-keep-together"><h2>Radar de Competências</h2><div style="text-align:center;">' + buildCompetenciasRadar(scores) + '</div><p style="text-align:center;font-style:italic;color:#6b7280;font-size:10px;margin-top:8px;">Competências derivadas a partir das 4 dimensões DISC. Modelo de mapeamento baseado em literatura comportamental.</p></div>'
+    + '<div class="section card-keep-together"><h2>Mapa de Quadrantes</h2><div style="text-align:center;">' + buildQuadranteMap(scores) + '</div></div>'
     + '<div class="section"><h2>Resumo do Perfil</h2>' + paragraph(n.resumoExecutivo) + '</div>'
     + '<div class="section"><h2>Leitura Central</h2>' + paragraph(n.leituraCentral) + '</div>'
     + '<div class="section"><h2>Perfil por Dimensão</h2>' + dimensionCards + '</div>'
