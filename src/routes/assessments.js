@@ -110,7 +110,55 @@ adminAssessmentRouter.get('/', async (req, res) => {
 });
 adminAssessmentRouter.get('/:id', async (req, res) => { try { const assessment = await prisma.assessment.findUnique({ where: { id: req.params.id }, include: { user: { select: { id: true, name: true, email: true, phone: true } }, report: true } }); if (!assessment) return res.status(404).json({ error: 'Assessment nao encontrado' }); return res.json({ assessment }); } catch (err) { console.error(err); return res.status(500).json({ error: 'Erro interno' }); } });
 adminAssessmentRouter.patch('/:id/release', async (req, res) => { try { const assessment = await prisma.assessment.findUnique({ where: { id: req.params.id }, include: { report: true, user: { select: { name: true, email: true } } } }); if (!assessment) return res.status(404).json({ error: 'Assessment nao encontrado' }); if (assessment.status === 'IN_PROGRESS') return res.status(400).json({ error: 'Assessment ainda nao foi completado' }); const { adminNotes } = req.body || {}; const updated = await prisma.assessment.update({ where: { id: assessment.id }, data: { status: 'RELEASED', releasedAt: new Date(), adminNotes: adminNotes || assessment.adminNotes }, include: { report: true, user: { select: { name: true, email: true } } } }); return res.json({ assessment: updated, message: 'Assessment liberado! Agora gere o relatorio.' }); } catch (err) { console.error(err); return res.status(500).json({ error: 'Erro interno' }); } });
-adminAssessmentRouter.post('/:id/generate-report', async (req, res) => { try { const assessment = await prisma.assessment.findUnique({ where: { id: req.params.id }, include: { report: true, user: { select: { name: true, email: true } } } }); if (!assessment) return res.status(404).json({ error: 'Assessment nao encontrado' }); if (assessment.report) return res.status(400).json({ error: 'Relatorio ja existe' }); if (assessment.status === 'IN_PROGRESS') return res.status(400).json({ error: 'Assessment ainda nao foi completado' }); const toolSlug = await resolveToolSlugById(assessment.toolId); const handler = getToolHandler(toolSlug); await handler.generateReport(assessment.id); try { await sendReportReadyEmail(assessment.user.email, assessment.user.name, config.appUrl); } catch (emailErr) { console.error('Email failed:', emailErr.message); } const updated = await prisma.assessment.findUnique({ where: { id: assessment.id }, include: { report: true, user: { select: { name: true, email: true } } } }); return res.json({ assessment: updated, message: 'Relatorio gerado e email enviado!' }); } catch (err) { console.error('Generate report error:', err); return res.status(500).json({ error: 'Erro ao gerar relatorio: ' + err.message }); } });
+adminAssessmentRouter.post('/:id/generate-report', async (req, res) => {
+  try {
+    const assessment = await prisma.assessment.findUnique({
+      where: { id: req.params.id },
+      include: { report: true, user: { select: { name: true, email: true } } }
+    });
+    if (!assessment) return res.status(404).json({ error: 'Assessment nao encontrado' });
+    if (assessment.status === 'IN_PROGRESS') return res.status(400).json({ error: 'Assessment ainda nao foi completado' });
+
+    // Regeração: se já existe report, deleta antes (idempotente via deleteMany).
+    // Se status era REPORT_GENERATED, volta para RELEASED para evitar estado "REPORT_GENERATED sem report" se generation falhar.
+    // Demais status (COMPLETED/REVIEWED) são preservados.
+    // TODO(hardening): tornar deleteMany+update atômico via prisma.$transaction.
+    const isRegeneration = !!assessment.report;
+    const originalStatus = assessment.status;
+    if (isRegeneration) {
+      try {
+        await prisma.report.deleteMany({ where: { assessmentId: assessment.id } });
+        await prisma.assessment.update({
+          where: { id: assessment.id },
+          data: { status: originalStatus === 'REPORT_GENERATED' ? 'RELEASED' : originalStatus }
+        });
+      } catch (delErr) {
+        console.error('Erro ao deletar report anterior:', delErr);
+        return res.status(500).json({ error: 'Erro ao preparar regeração: ' + delErr.message });
+      }
+    }
+
+    const toolSlug = await resolveToolSlugById(assessment.toolId);
+    const handler = getToolHandler(toolSlug);
+    await handler.generateReport(assessment.id);
+
+    try { await sendReportReadyEmail(assessment.user.email, assessment.user.name, config.appUrl); }
+    catch (emailErr) { console.error('Email failed:', emailErr.message); }
+
+    const updated = await prisma.assessment.findUnique({
+      where: { id: assessment.id },
+      include: { report: true, user: { select: { name: true, email: true } } }
+    });
+    return res.json({
+      assessment: updated,
+      message: isRegeneration ? 'Relatorio regerado e email enviado!' : 'Relatorio gerado e email enviado!'
+    });
+  } catch (err) {
+    console.error('Generate report error:', err);
+    const status = err.statusCode || 500;
+    return res.status(status).json({ error: status === 500 ? 'Erro ao gerar relatorio: ' + err.message : err.message });
+  }
+});
 adminAssessmentRouter.post('/bulk-release', async (req, res) => {
   try {
     const { toolSlug } = req.body || {};
