@@ -15,7 +15,7 @@ function paragraph(value) { return '<p class="text">' + esc(value) + '</p>'; }
 function buildBars(items) { return items.map(item => { const score = Number(item.score || 0); const color = item.color || '#d4a853'; return '<div class="bar-row"><div class="bar-head"><span>' + esc(item.label) + '</span><strong style="color:' + color + '">' + score + '</strong></div><div class="bar-track"><div class="bar-fill" style="width:' + score + '%;background:' + color + '"></div></div></div>'; }).join(''); }
 
 function buildDiscRadar(scores = {}) {
-  const size = 300, center = size / 2, radius = 110, factors = ['D', 'I', 'S', 'C'];
+  const size = 360, center = size / 2, radius = 110, factors = ['D', 'I', 'S', 'C'];
   const angles = factors.map((_, i) => (Math.PI * 2 * i) / 4 - Math.PI / 2);
   const getPoint = (angle, value) => ({ x: center + Math.cos(angle) * (radius * value / 100), y: center + Math.sin(angle) * (radius * value / 100) });
   let svg = '<svg viewBox="0 0 ' + size + ' ' + size + '" xmlns="http://www.w3.org/2000/svg" width="300" height="300">';
