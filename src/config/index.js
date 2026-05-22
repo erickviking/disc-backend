@@ -8,10 +8,10 @@ function optionalEnv(name) {
   return value && value.trim() !== '' ? value : null;
 }
 
-const jwtSecret = optionalEnv('JWT_SECRET') || 'temporary-production-secret-change-immediately';
+const jwtSecret = optionalEnv('JWT_SECRET');
 
-if (isProduction && !optionalEnv('JWT_SECRET')) {
-  console.warn('ALERTA: JWT_SECRET nao configurado. Configure uma variavel segura no ambiente de producao.');
+if (!jwtSecret) {
+  throw new Error('JWT_SECRET nao configurado. Defina uma variavel de ambiente segura antes de iniciar a aplicacao.');
 }
 
 if (isProduction && jwtSecret.length < 32) {
